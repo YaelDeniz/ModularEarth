@@ -1,2 +1,2 @@
 # ModularEarth
-TGeoManager (CERN ROOT) based application to create 3D models of the Earth with compositional heterogeneties in different layers. This application allows to create 3D models from PREM
+ModularEarth is a TGeoManager (CERN ROOT) based application that creates 3D models based on PREM .txt files. This application allows you to customize the density and composition in localized regions of different layers of the Earth, representing heterogeneties in those layers.

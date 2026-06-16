@@ -1,0 +1,190 @@
+Block class:
+    --To do list:
+    1) Error message line 110: units check, input for SetBlockGeometry must be in degrees and non-negative
+    2) Switch "DefineBlockMaterial" arguments from (const std::string & name, double A, double Z, double rho) to (const std::string & name, double Z, double A, double rho)
+
+SubLayer class:
+    --To do list:
+    1) Switch "SetSubLayerMaterial" arguments from (const std::string & name, double A, double Z, double rho) to (const std::string & name, double Z, double A, double rho)
+    2) Swith "CreateSubLayerBlocks" arguments from (double r1, double r2, double dphi, double dth) to (double r1, double r2, double dth, double dphi)
+    3) Set Error message if the size of bin does not correpond to integer number of bins
+    4) Binnig the inner most layer comes with nudgging problems at the origin. Solution is to choose a sphere volume instead of a binned layer 
+
+General tasks:
+  1) Test tracking trough Each class?  
+        Sublayer class -> Tracking seems working fine
+        Layer    Class -> Tracking seems working fine
+        Earth    Class -> 
+  2) Add markers indicating the steps taken by the tracking algorithm
+  3)Modify the sublayer program so it creates the inner most layer as sphere volume instead of a binned shell
+  4)Add tracking Algorithm to Modular Earth (nudging and zenith epsilon)
+
+
+Developing notes:
+    gGeoManager->IsOutside() :  Evaluate weather particle still inside Top Volume, once paticle leave top volume this function returns "True"
+    it seems that the trackers at intersection of block edges sometimes miss the volumes boundaries. ** Fix the southPole NorthPole problem with setting tolerance in the 
+    zenith direction/ if theta = 0 (180) add eps(-eps) **
+
+    Nudging is beacoming a problem, at some points particel stops finding the next boundary and take a couple of loops before doing it
+
+
+  /////Working Tracking algorithm
+
+      std::cout << "Initializing Tracking" << std::endl;
+    gGeoManager->InitTrack(r_src.X(), r_src.Y(), r_src.Z(), n_dir.X(), n_dir.Y(), n_dir.Z());
+    gGeoManager->FindNode();
+
+    while (!gGeoManager->IsOutside()) 
+    {   
+        gGeoManager->FindNextBoundary(); 
+        gGeoManager->Step();
+        //current location info
+        double cx = gGeoManager->GetCurrentPoint()[0];
+        double cy = gGeoManager->GetCurrentPoint()[1];
+        double cz = gGeoManager->GetCurrentPoint()[2];
+        double r_bnd = sqrt((cx*cx)+(cy*cy)+(cz*cz));
+
+        //auto cvol = gGeoManager->GetCurrentVolume();
+        //gGeoManager->FindNextBoundary(); 
+        //std::cout << " R " << r_bnd << " | " << cx << " " << cy << " " << cz << " Volume Name" <<  cvol->GetName() << " Step: " << step << std::endl;
+        //bool entering = gGeoManager->IsEntering();
+        //gGeoManager->Step();
+        //bool exiting  = gGeoManager->IsExiting();
+
+        //std::cout << std::boolalpha << "  Entering Volume: " << entering << std::endl;
+        //std::cout << std::boolalpha << "  Exiting Volume: " << exiting << std::endl;
+
+        //CurrentoVolume Info 
+        const char* path = gGeoManager->GetPath();
+        TGeoVolume* cvolume = gGeoManager->GetCurrentVolume();
+        TGeoMaterial* cmaterial = cvolume->GetMedium()->GetMaterial();
+        TGeoNode* cnode = gGeoManager->GetCurrentNode();
+
+        std::string volName = cvolume->GetName();
+        std::string matName = cmaterial->GetName();
+
+        
+        double density = cmaterial->GetDensity();
+        double A = cmaterial->GetA();
+        double Z = cmaterial->GetZ();
+        double ZoverA = (A > 0) ? Z / A : 0.0;
+
+        //Step to next boundary
+        double step = gGeoManager->GetStep();
+        double length = step;
+
+        std::cout << std::fixed << std::setprecision(3)
+                << " Boundary radius " << r_bnd << " Coordinates " << cx << " " << cy << " " << cz << " | "
+                << "Step Length: " << length << " cm, " << std::endl;
+        std::cout << "ρ: " << density << " g/cm³, "
+                << "Z/A: " << ZoverA << ", "
+                << "Material: " << matName << ", "
+                << "Volume: " << volName << std::endl;
+        std::cout << " " << std::endl;
+
+        //gGeoManager->FindNextBoundary(); 
+        //gGeoManager->Step();
+    }
+
+  /////////
+      //gGeoManager->InitTrack(0.0, 0.0, 0.0, n_dir.X(), n_dir.Y(), n_dir.Z());
+    TPolyMarker3D *trackingpoints = new TPolyMarker3D();
+    trackingpoints->SetMarkerColor(kGreen);
+    trackingpoints->SetMarkerSize(15);
+
+    double TotalLegth = 0;
+   
+    //gGeoManager->FindNextBoundaryAndStep(); //First Step
+
+    double cx = gGeoManager->GetCurrentPoint()[0];
+    double cy = gGeoManager->GetCurrentPoint()[1];
+    double cz = gGeoManager->GetCurrentPoint()[2];
+    //////
+    
+    auto vol = gGeoManager->GetCurrentVolume();
+
+    if (gGeoManager->IsEntering()) {
+        std::cout << ">>> ENTERING: " << vol->GetName()
+                  << " at (" << cx << ", " << cy << ", " << cz << ")\n";
+    }
+    if (gGeoManager->IsExiting()) {
+        std::cout << "<<< EXITING: " << vol->GetName()
+                  << " at (" << cx << ", " << cy << ", " << cz << ")\n";
+    }
+
+    //////
+    TotalLegth += gGeoManager->GetStep();
+
+   
+
+    NuDetMarkers->SetPoint( 2 , cx,cy,cz);
+
+    std::cout << "Distance to first volume boundary" << TotalLegth << " | " << cx << " " << cy << " " << cz << std::endl;
+
+
+    //gGeoManager->Step();
+
+    //////////////////////////////////////////////////////
+    int markerid = 3;
+    while (!gGeoManager->IsOutside()) 
+    {   
+             gGeoManager->FindNode(); 
+            gGeoManager->FindNextBoundaryAndStep(); // Get next step
+            
+            PrintVolumeTransition();
+
+            double step = gGeoManager->GetStep();
+            if (step <= 0) break;
+
+            //gGeoManager->Step(); // Move to next boundary
+            TotalLegth +=step;
+            const char* path = gGeoManager->GetPath();
+            TGeoVolume* cvolume = gGeoManager->GetCurrentVolume();
+            TGeoMaterial* cmaterial = cvolume->GetMedium()->GetMaterial();
+            TGeoNode* cnode = gGeoManager->GetCurrentNode();
+
+            if (!cvolume || !cmaterial) break;
+
+            std::string volName = cvolume->GetName();
+            std::string matName = cmaterial->GetName();
+
+            double length = step;
+            double density = cmaterial->GetDensity();
+            double A = cmaterial->GetA();
+            double Z = cmaterial->GetZ();
+            double ZoverA = (A > 0) ? Z / A : 0.0;
+
+            //Marker
+
+            cx = gGeoManager->GetCurrentPoint()[0];
+            cy = gGeoManager->GetCurrentPoint()[1];
+            cz = gGeoManager->GetCurrentPoint()[2];
+
+            NuDetMarkers->SetPoint( markerid , cx,cy,cz);
+            ++markerid;
+
+            //int layerID = -1, sublayerID = -1;
+            //sscanf(volName.c_str(), "Layer%d_Sublayer%d", &layerID, &sublayerID);
+
+            std::cout << std::fixed << std::setprecision(3)
+                    << cx << " " << cy << " " << cz << " | "
+                    << "Step Length: " << length << " cm, "
+                    << "Total Length: " << TotalLegth << " cm, "
+                    << "ρ: " << density << " g/cm³, "
+                    << "Z/A: " << ZoverA << ", "
+                    << "Material: " << matName << ", "
+                    << "Volume: " << volName << std::endl;
+
+                    
+    }
+
+    ////////
+    top->Draw("gl");
+    //detMarker->Draw("same");
+    NuDetMarkers->Draw("same");
+    //trackingpoints->Draw("same");
+    //srcDetMarkers->Draw("same");
+    nuLine->Draw("same");
+    TView *view = gPad->GetView();
+    //view->ShowAxis();
+

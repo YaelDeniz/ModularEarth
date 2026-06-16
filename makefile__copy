@@ -1,0 +1,56 @@
+# Compiler and ROOT flags
+CXX      = g++
+CXXFLAGS = -O2 -Wall -fPIC -std=c++17 $(shell root-config --cflags)
+LDFLAGS  = $(shell root-config --libs)
+
+INCDIR   = inc
+SRCDIR   = src
+DICTDIR  = dict
+BUILDDIR = build
+
+TARGET_LIB = libModularEarth.so
+
+HEADERS := $(filter-out inc/LinkDef.h, $(wildcard inc/*.h))
+SOURCES = $(wildcard $(SRCDIR)/*.C)
+OBJS    = $(patsubst $(SRCDIR)/%.C,$(BUILDDIR)/%.o,$(SOURCES))
+
+DICT_SRC = $(DICTDIR)/ModularEarthDict.cxx
+DICT_OBJ = $(BUILDDIR)/ModularEarthDict.o
+
+# ------------------------
+
+.PHONY: all clean run
+
+all: $(TARGET_LIB)
+
+# Make dirs if needed
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+$(DICTDIR):
+	mkdir -p $(DICTDIR)
+
+# Build ROOT dictionary
+$(DICT_SRC): $(HEADERS) | $(DICTDIR)
+	rootcling -f $@ -I$(INCDIR) $(HEADERS) $(INCDIR)/LinkDef.h
+
+$(DICT_OBJ): $(DICT_SRC) | $(BUILDDIR)
+	$(CXX) $(CXXFLAGS) -I. -c $< -o $@
+
+# Compile src objects
+$(BUILDDIR)/%.o: $(SRCDIR)/%.C | $(BUILDDIR)
+	$(CXX) $(CXXFLAGS) -I$(INCDIR) -c $< -o $@
+
+# Build shared lib
+$(TARGET_LIB): $(OBJS) $(DICT_OBJ)
+	$(CXX) -shared -o $@ $^ $(LDFLAGS)
+
+# Run macro inside ROOT
+run: $(TARGET_LIB)
+# root -l -b -q 'tutorials/SubLayerTutorial.cpp'
+	root -l -e 'gSystem->Load("./$(TARGET_LIB)");' tutorials/SubLayerTutorial.cpp
+
+
+
+clean:
+	rm -rf $(BUILDDIR) $(DICTDIR) *.so *.pcm

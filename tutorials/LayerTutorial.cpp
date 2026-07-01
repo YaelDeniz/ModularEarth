@@ -116,7 +116,7 @@ void LayerTutorial() {
     // Select blocks to update in SubLayer #1 (Mantle)
     // ------------------------------------------------------------
 
-    size_t sublayerIndex = 1;
+    size_t sublayerIndex = 2;
 
     // IDs of blocks you want to modify
     std::vector<int> blockIDs = {3, 7, 12};
@@ -188,6 +188,9 @@ void LayerTutorial() {
     top->AddNode(Crust.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
     top->AddNode(Ocean.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
     top->AddNode(Atmosphere.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
+
+    //Check for updates in SuUBLAYER
+    UpperMantle.SubLayerBlockMap(sublayerIndex);
     
 
     /////////////////////////////

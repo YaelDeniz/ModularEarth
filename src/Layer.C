@@ -125,7 +125,41 @@ namespace ModularEarth {
         std::cout << " Number of Sublayers:" << sublayers.size() << std::endl;
     }
 
-}
+    
+    void Layer::SubLayerBlockMap( int sl_id) const
+    {
+        // GetTopNode() gives the top node — not GetNode(0) which searches the current branch
+        TGeoNode* TopNode = gGeoManager->GetTopNode();
+
+        TString TopNode_path = TString("/") + TopNode->GetName();
+
+        //TGeoVolume* not TGeoVolumeNode* — that type does not exist
+        TGeoVolume* Top = gGeoManager->GetTopVolume();
+
+        int nDaughters_top = Top->GetNdaughters();
+
+
+        if (sl_id > nDaughters_top){ printf("Idex cannot exceed DAUGHTERS IN TOP (# OF SUBLAYERS): %i\n", nDaughters_top);      
+        }
+        else {
+        int node_id = sl_id - 1;
+
+        TGeoNode* SubLayerNode = Top->GetNode(node_id);
+
+        TString SubLayer_node_name = SubLayerNode->GetName();
+        
+        TString SubLayerNode_path =  TopNode_path + TString("/") + SubLayer_node_name;
+
+        printf("SUBLAYER NODE [%d]: %s\n", sl_id, SubLayer_node_name.Data());
+
+        printf("SUBLAYER Path [%d]: %s\n", sl_id, SubLayerNode_path.Data());
+
+        sublayers[node_id].GetBlockVertices(gGeoManager, SubLayerNode_path);
+        }
+        
+    }
+
+};
 
 
 

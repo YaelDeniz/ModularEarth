@@ -369,12 +369,15 @@ namespace ModularEarth {
             // ------------------------------------------------------------------
             // Diagnostics and debugging
             // ------------------------------------------------------------------
+            
+            void LayerSummary() const; 
 
             void SubLayerSummary(size_t sublayerIndex) const ;
 
             void BlockSummary(size_t sublayerIndex, int blockIndex) const ;
 
-            void LayerSummary() const ;
+            void SubLayerBlockMap(int sl_id) const ;
+
     };
 
 }

@@ -19,6 +19,13 @@
 #include <TView.h>
 #include <TCanvas.h>
 #include <TGraph.h>
+#include <TGeoSphere.h>
+#include <TMath.h>
+
+
+
+#include <TSystem.h>
+#include <TROOT.h>
 
 
 // Modular Earth classes
@@ -26,12 +33,13 @@
 
 
 namespace ModularEarth {
-
+    // NOTES overlapping shapes ? Are blocks  tiling cleanly
     void Sublayer::BuildAssembly() {
         if (SubLayer) delete SubLayer;
         SubLayer = new TGeoVolumeAssembly(SubLayerName.c_str());
 
         static TGeoTranslation * sharedTranslation = new TGeoTranslation(0, 0, 0);
+        // Alternative: TGeoTranslation * sharedTranslation = new TGeoTranslation(0, 0, 0);
         for (const auto & b: blocks) {
             if (b.GetVolume() == nullptr) {
                 std::cerr << "Block is empty volume!\n";
@@ -203,8 +211,103 @@ namespace ModularEarth {
             << "Number of Blocks: " << blocks.size() << "\n"
             << "Sublayer Updates: Full(" << std::boolalpha << FullUpdate
             << ") Blocks(" << BlocksUpdate << ")" << std::endl;
+        }
+
+
+    void Sublayer::GetBlockVertices(TGeoManager* mgr, TString SubLayerNode_path) const {
+
+        // I need to pass a node so that i can acces the volume.
+
+        
+
+        // dynamic_cast to confirm it is actually an assembly
+        TGeoVolumeAssembly* SubLayerVolume =
+            dynamic_cast<TGeoVolumeAssembly*>(SubLayer);
+
+        TString SubLayerVol_name = SubLayerVolume->GetName();
+
+   
+
+        TString filename = "/home/ydenizhernandez/ModularEarth/tutorials/" + SubLayerVol_name + "_test.csv";
+
+        FILE* f = fopen(filename, "w");
+        
+        if (!f) {
+            printf("ERROR: could not open file — %s\n", strerror(errno));
+            return;
+        }
+
+        fprintf(f, "block_id,mod_flag,phi1,phi2,theta1,theta2,x,y,z\n");
+
+        if (!SubLayerVolume) {
+            printf("  WARNING: %s is not a TGeoVolumeAssembly\n",
+            SubLayerVol_name.Data());
+            fclose(f);
+            return;
+        }
+        
+        
+
+        printf("SUBLAYER NODE: %s\n", SubLayerNode_path.Data());
+
+        int nDaughters = SubLayerVolume->GetNdaughters();
+        printf("  BLOCKS IN THIS SUBLAYER: %d\n", nDaughters);
+
+        for (int i = 0; i < nDaughters; i++) {
+            int modFlag = blocks[i].IsBlockModified()    ? 1
+                        : blocks[i].IsSubLayerModified() ? 2
+                        : 0;
+            printf("  BLOCK [%d]: modFlag=%d\n", i, modFlag);
+            TGeoNode* bnode = SubLayerVolume->GetNode(i);
+            TString BlockVol_path = SubLayerNode_path + TString("/") + bnode->GetName();
+            
+            if (!mgr->cd(BlockVol_path)) {
+            printf("  WARNING: path %s is not valid\n", BlockVol_path.Data());  
+            continue;
+            }
+
+            printf("  BLOCK [%d]: %s\n", i, BlockVol_path.Data());
+
+            TGeoSphere* blk  = dynamic_cast<TGeoSphere*>(bnode->GetVolume()->GetShape());
+
+            if (!blk) continue;
+
+            mgr->cd(BlockVol_path);
+
+            TGeoMatrix* globalMatrix = mgr->GetCurrentMatrix();  // full chain
+
+            double rmax     = blk->GetRmax();
+            double rmin     = blk->GetRmin();
+            double phis[2]   = { blk->GetPhi1(),   blk->GetPhi2()   };
+            double thetas[2] = { blk->GetTheta1(),  blk->GetTheta2() };
+            printf("  Angular coordinates limits: (%.4f, %.4f,%.4f, %.4f)\n", phis[0] ,phis[1] ,thetas[0],thetas[1] );
+            printf("  Radial coordinates limits: (%.4f, %.4f)\n", rmin, rmax );
+            
+            for (double phi_deg : phis) {
+                for (double theta_deg : thetas) {
+                    double phi   = phi_deg   * TMath::DegToRad();
+                    double theta = theta_deg * TMath::DegToRad();
+
+                    double local[3] = {
+                        rmax * TMath::Sin(theta) * TMath::Cos(phi),
+                        rmax * TMath::Sin(theta) * TMath::Sin(phi),
+                        rmax * TMath::Cos(theta)
+                    };
+                    double world[3];
+                    globalMatrix->LocalToMaster(local, world);
+
+                    printf("  World: (%.4f, %.4f, %.4f)\n", world[0], world[1], world[2]);
+                    fprintf(f, "%d,%d,%.6f,%.6f,%.6f,%.6f,%.4f,%.4f,%.4f\n",
+                        i, modFlag,
+                        blk->GetPhi1(), blk->GetPhi2(),
+                        blk->GetTheta1(), blk->GetTheta2(),
+                        world[0], world[1], world[2]);
+
+                }
+            }
+                
+        }
+        fclose(f);
     }
-
-
 
 };

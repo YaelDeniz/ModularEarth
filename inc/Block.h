@@ -163,6 +163,9 @@ namespace  ModularEarth {
             /// Return the unique block identifier.
             int GetBlockID() const;
 
+            bool IsBlockModified() const;
+            bool IsSubLayerModified() const ;
+
 
             // ------------------------------------------------------------------
             // Diagnostics and Debugging

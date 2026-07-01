@@ -180,6 +180,9 @@ namespace ModularEarth {
         std::cout << "=====================\n";
     }
 
+    bool Block::IsBlockModified() const { return BlockModified; };
+    bool Block::IsSubLayerModified() const { return SubLayerModified; };
+
     TGeoVolume* Block::GetVolume() const {
         return block;
     }

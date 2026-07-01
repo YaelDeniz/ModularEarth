@@ -23,6 +23,11 @@
 #include "TView.h"
 #include "TCanvas.h"
 #include "TGraph.h"
+#include "TGeoSphere.h"
+#include "TMath.h"
+
+#include "TSystem.h"
+#include "TROOT.h"
 
 #include "Block.h"
 
@@ -271,7 +276,11 @@ namespace ModularEarth {
 
             /// Print a concise summary of SubLayer properties and update state.
             void GetSubLayerSummary();
+
+            void GetBlockVertices(TGeoManager* mgr, TString SubLayerNode_path) const;
     };
+
+
 
 
 };

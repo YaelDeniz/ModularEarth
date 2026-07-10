@@ -49,7 +49,7 @@ void SubLayerTutorial() {
     top->AddNode(TestSubLayer1.GetSubLayerVolume() , 1, new TGeoTranslation(0, 0, 0));// GetSubLayerVolume return the actual TGeoManager Volume, this need to be add to the top volume or to anothr TGeoAssembly.
 
     ModularEarth::Sublayer TestSubLayer2;
-    TestSubLayer2.SetSubLayerID(1); //Set SubLayer Idex
+    TestSubLayer2.SetSubLayerID(2); //Set SubLayer Idex
     TestSubLayer2.SetSubLayerMaterial("TestMaterial2", 2,3,23.4); //Sublayer Material must be defined before creating sublayer volume
     TestSubLayer2.CreateSubLayerBlocks(3880,4680,60,30); //Create a sublayer given their inner and outer radius and lon and lat bin size
     TestSubLayer2.BuildSubLayer(); // Build the layer
@@ -62,7 +62,7 @@ void SubLayerTutorial() {
     
     geoManager->CloseGeometry(); //Here we finished the model creation. "Closed" means that no more modification can be made to the model.
 
-    geoManager->SetTopVisible();     // Ensure top volume shows up
+    //geoManager->SetTopVisible();     // Ensure top volume shows up
 
       // ---- Draw to a canvas
     TCanvas *c = new TCanvas("c", "SubLayerTutorial", 1200, 900);

@@ -81,10 +81,10 @@ void LayerTutorial() {
 
     TGeoMaterial *matIC = new TGeoMaterial("SolidNiFe",  0.4691, 1, 12.9807);
     TGeoMedium *medIC = new TGeoMedium("SolidNiFe", 1, matIC);
-    TGeoVolume* InnerCore = new TGeoVolume("InnerCore", new TGeoSphere("Sphere", 0, 1221.5), medIC);
+    TGeoVolume* InnerCore = new TGeoVolume("InnerCore_1", new TGeoSphere("Sphere", 0, 1221.5), medIC);
 
     //
-    ModularEarth::Layer OuterCore("OuterCore",1,30,60);
+    ModularEarth::Layer OuterCore("OuterCore",2,30,60);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigOC = {
         {1,1221.5, 1946.7, 11.9512, 0.4691, 1, "FeNi"},
         {2,1946.7, 2475.1, 11.4726, 0.4691, 1, "FeNi"},
@@ -95,7 +95,7 @@ void LayerTutorial() {
     OuterCore.SetSubLayers(sublayersconfigOC);
     OuterCore.BuildLayer();
 
-    ModularEarth::Layer LowerMantle("LowerMantle",2,30,60);
+    ModularEarth::Layer LowerMantle("LowerMantle",3,30,60);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigLM = {
         {1,3480.0, 4476.0, 5.3225, 0.4954, 1, "SilicateLM"},
         {2,4476.0, 5378.4, 4.8332, 0.4691, 1, "SilicateLM"},
@@ -104,19 +104,20 @@ void LayerTutorial() {
     LowerMantle.SetSubLayers(sublayersconfigLM);
     LowerMantle.BuildLayer();
 
-    ModularEarth::Layer UpperMantle("UpperMantle",3,30,60);
+    ModularEarth::Layer UpperMantle("UpperMantle",4,30,60);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigUM = {
         {1,5701.0, 5971.0, 3.8983	, 0.4954, 1, "SilicateUM"},
-        {2,5971.0, 6346.6, 3.4306	, 0.4691, 1, "SilicateUM"}
+        {2,5971.0, 6346.6, 3.4306	, 0.4691, 1, "SilicateUM"},
+        {1,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"}
     };
     UpperMantle.SetSubLayers(sublayersconfigUM);
 
     
     // ------------------------------------------------------------
-    // Select blocks to update in SubLayer #1 (Mantle)
+    // Select blocks to update in SubLayer #2 (Mantle)
     // ------------------------------------------------------------
 
-    size_t sublayerIndex = 2;
+   
 
     // IDs of blocks you want to modify
     std::vector<int> blockIDs = {3, 7, 12};
@@ -132,9 +133,29 @@ void LayerTutorial() {
     // ------------------------------------------------------------
     // Apply the update
     // ------------------------------------------------------------
+
+
+    //Check for updates in SuUBLAYER
+    size_t sublayerIndex = 2;
+
+      // IDs of blocks you want to modify
+    std::vector<int> blockID1s = {3, 7, 12};
+
+    LowerMantle.UpdateBlocksInSubLayer(
+        1,
+        blockID1s,
+        newMaterialName,
+        newA,
+        newZ,
+        newDensity
+    );
+
+     // IDs of blocks you want to modify
+    std::vector<int> blockIDs2 = {9, 15, 21};
+
     UpperMantle.UpdateBlocksInSubLayer(
         sublayerIndex,
-        blockIDs,
+        blockIDs2,
         newMaterialName,
         newA,
         newZ,
@@ -142,36 +163,31 @@ void LayerTutorial() {
     );
 
 
+
+
     // ------------------------------------------------------------
     // Optional: verify changes
     // ------------------------------------------------------------
     UpperMantle.SubLayerSummary(sublayerIndex);
 
-
-
-
-
-
-
-
     UpperMantle.BuildLayer();
 
-    ModularEarth::Layer Crust("Crust",4,30,60);
+    ModularEarth::Layer Crust("Crust",5,30,60);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigC = {
-        {1,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"},
+        //{1,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"},
         {2,6356.0, 6368.0, 2.6000	, 0.4956, 1, "SilicateC"}
     };
     Crust.SetSubLayers(sublayersconfigC);
     Crust.BuildLayer();
 
-    ModularEarth::Layer Ocean("Ocean",5,30,60);
+    ModularEarth::Layer Ocean("Ocean",6,30,60);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigO = {
         {1,6368.0, 6371.0, 1.0200	, 0.5525, 1, "SilicateO"}
     };
     Ocean.SetSubLayers(sublayersconfigO);
     Ocean.BuildLayer();
 
-    ModularEarth::Layer Atmosphere("Atmosphere",6,30,60);
+    ModularEarth::Layer Atmosphere("Atmosphere",7,30,60);
 
       std::vector<ModularEarth::SublayerConfig> sublayersconfigAtm = {
         {1,6371.0, 6386.0	, 0.001	, 0.4991, 1, "Vac"}
@@ -189,9 +205,13 @@ void LayerTutorial() {
     top->AddNode(Ocean.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
     top->AddNode(Atmosphere.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
 
-    //Check for updates in SuUBLAYER
+  
+    LowerMantle.SubLayerBlockMap(1);
     UpperMantle.SubLayerBlockMap(sublayerIndex);
-    
+
+    // printf("MODULAR_EARTH_DIR = %s\n", DMODULAR_EARTH_DIR);
+
+    //UpperMantle.Call_The_Roll(); // Useful for debbuging and model checks... It list all the layers and sublayers in the model and their names+IDs.
 
     /////////////////////////////
     

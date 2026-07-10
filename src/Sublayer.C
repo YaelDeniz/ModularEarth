@@ -214,23 +214,24 @@ namespace ModularEarth {
         }
 
 
-    void Sublayer::GetBlockVertices(TGeoManager* mgr, TString SubLayerNode_path) const {
+    void Sublayer::GetBlockVertices(TGeoManager* mgr, TString SubLayerNode_path, TString filename ) const {
 
         // I need to pass a node so that i can acces the volume.
 
-        
-
         // dynamic_cast to confirm it is actually an assembly
-        TGeoVolumeAssembly* SubLayerVolume =
-            dynamic_cast<TGeoVolumeAssembly*>(SubLayer);
+        TGeoVolumeAssembly* SubLayerVolume = dynamic_cast<TGeoVolumeAssembly*>(SubLayer);
 
         TString SubLayerVol_name = SubLayerVolume->GetName();
 
-   
+        if (filename.IsNull()) {
+            
+            TString ModularEarthDir = gSystem->pwd();
+            filename = ModularEarthDir+ "/tutorials/" + SubLayerVol_name + "_default.csv";
+            printf("No filename provided. Using default name: %s\n", filename.Data());
 
-        TString filename = "/home/ydenizhernandez/ModularEarth/tutorials/" + SubLayerVol_name + "_test.csv";
-
-        FILE* f = fopen(filename, "w");
+        }
+        
+        FILE* f = fopen(filename.Data(), "w");
         
         if (!f) {
             printf("ERROR: could not open file — %s\n", strerror(errno));

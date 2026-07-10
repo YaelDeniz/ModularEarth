@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 # --- read the csv ---
-df = pd.read_csv("tutorials/SubLayer_1_test.csv")
+df = pd.read_csv("tutorials/SubLayer_2_default.csv")
 
 # --- set up the map ---
 fig, ax = plt.subplots(figsize=(12, 6))

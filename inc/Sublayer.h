@@ -277,7 +277,7 @@ namespace ModularEarth {
             /// Print a concise summary of SubLayer properties and update state.
             void GetSubLayerSummary();
 
-            void GetBlockVertices(TGeoManager* mgr, TString SubLayerNode_path) const;
+            void GetBlockVertices(TGeoManager* mgr, TString SubLayerNode_path, TString filename = "" ) const;
     };
 
 

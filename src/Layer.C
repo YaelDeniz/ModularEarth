@@ -125,39 +125,108 @@ namespace ModularEarth {
         std::cout << " Number of Sublayers:" << sublayers.size() << std::endl;
     }
 
+    void Layer::Call_The_Roll(){
+        
+        Printf("Calling the roll for current model setup: Method from Layer %s ===\n", layerName.c_str());
+        TGeoNode* TopNode = gGeoManager->GetTopNode();
+
+        TString TopNode_path = TString("/") + TopNode->GetName();
+
+        //TGeoVolume* volume 
+        TGeoVolume* Top = gGeoManager->GetTopVolume();
+
+        int nDaughters_top = Top->GetNdaughters(); // Number of Layers in the top volume.
+
+        for (int k = 0; k < nDaughters_top; ++k) {
+            TGeoNode* TestNode = Top->GetNode(k);
+            TString TestNode_name = TestNode->GetName();
+            printf("NODE IN TOP [%d]: %s\n", k, TestNode_name.Data());
+            TGeoVolumeAssembly* TestAssembly = dynamic_cast<TGeoVolumeAssembly*>(TestNode->GetVolume());
+            if (!TestAssembly) {
+                printf("  WARNING: %s is not a TGeoVolumeAssembly\n",
+                TestNode->GetName());
+                continue;
+            }
+            else {
+                int nsublayer = TestAssembly->GetNdaughters();
+                printf("Total number of SubLayers in Layer %d: %i\n", k, nsublayer);
+            }
+        }
+
+    }
     
     void Layer::SubLayerBlockMap( int sl_id) const
     {
+
+        // NOTE: This function assumes that layerID  in ModularEarth is 1-based, while ROOT's TGeoManager uses 0-based indexing for nodes.
+        // Then this function adjusts for that by subtracting 1 from the layerID when accessing the top volume's nodes.
+
+        // NOTE: This function assumes that sl_id in ModularEarth is 1-based, while ROOT's TGeoManager uses 0-based indexing for nodes.
+
         // GetTopNode() gives the top node — not GetNode(0) which searches the current branch
         TGeoNode* TopNode = gGeoManager->GetTopNode();
 
         TString TopNode_path = TString("/") + TopNode->GetName();
 
-        //TGeoVolume* not TGeoVolumeNode* — that type does not exist
+        //TGeoVolume* volume 
         TGeoVolume* Top = gGeoManager->GetTopVolume();
 
-        int nDaughters_top = Top->GetNdaughters();
+        int nDaughters_top = Top->GetNdaughters(); // Number of Layers in the top volume.
 
+        printf("Total number of layers in TOP (# OF layers): %i\n", nDaughters_top);
+        
+        printf("This Layer's LayerID: %i\n", layerID); 
 
-        if (sl_id > nDaughters_top){ printf("Idex cannot exceed DAUGHTERS IN TOP (# OF SUBLAYERS): %i\n", nDaughters_top);      
+        int LayerNodeID = layerID - 1; // Adjust for 0-based indexing in ROOT's TGeoManager
+
+        TGeoNode* LayerNode = Top->GetNode(LayerNodeID); // 0-based vs 1-based indexing for LayerID?
+
+        if (!LayerNode) {
+            printf("  WARNING: LayerNode is null for LayerID %d\n", layerID);
+            return;
+        }
+
+        TString LayerNode_name =  LayerNode->GetName();
+
+        TString LayerNode_path =  TopNode_path + TString("/") + LayerNode_name;
+
+        TGeoVolumeAssembly* LayerAssembly = dynamic_cast<TGeoVolumeAssembly*>(LayerNode->GetVolume()); // ssign variable type to LayerAssembly
+
+        if (!LayerAssembly) {
+            printf("  WARNING: %s is not a TGeoVolumeAssembly\n",
+            LayerNode->GetName());
         }
         else {
-        int node_id = sl_id - 1;
 
-        TGeoNode* SubLayerNode = Top->GetNode(node_id);
+            int nDaughters_in_layer = LayerAssembly->GetNdaughters();
+            
+            printf("Total number of SubLayers mother Layer: %i\n", nDaughters_in_layer);
 
-        TString SubLayer_node_name = SubLayerNode->GetName();
-        
-        TString SubLayerNode_path =  TopNode_path + TString("/") + SubLayer_node_name;
+            if (sl_id < 1 || sl_id > nDaughters_in_layer){
+                
+                printf("Index cannot be < 1 or exceed daughters in mother layer (# OF SUBLAYERS): %i\n", nDaughters_in_layer);      
+            
+            }
 
-        printf("SUBLAYER NODE [%d]: %s\n", sl_id, SubLayer_node_name.Data());
+            else {
+                int SubLayerNode_id = sl_id - 1; //
 
-        printf("SUBLAYER Path [%d]: %s\n", sl_id, SubLayerNode_path.Data());
+                TGeoNode* SubLayerNode = LayerAssembly->GetNode(SubLayerNode_id);
 
-        sublayers[node_id].GetBlockVertices(gGeoManager, SubLayerNode_path);
+                TString SubLayerNode_name = SubLayerNode->GetName();
+                
+                TString SubLayerNode_path =  LayerNode_path + TString("/") + SubLayerNode_name;
+
+                printf("SUBLAYER node name [%d]: %s\n", sl_id, SubLayerNode_name.Data());
+
+                printf("SUBLAYER Path [%d]: %s\n", sl_id, SubLayerNode_path.Data());
+
+                TString filename = LayerNode_name + "-" + SubLayerNode_name + "_BlockMap.csv";
+
+                sublayers[SubLayerNode_id].GetBlockVertices(gGeoManager, SubLayerNode_path,filename);
+            }
         }
-        
-    }
+    } //SubLayerBlockMap
 
 };
 

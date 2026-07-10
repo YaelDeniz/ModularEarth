@@ -80,6 +80,43 @@ namespace ModularEarth {
         SublayerConfig(int id, double r1, double r2, double rho, double A, double Z, std::string name = "SubLayerMaterial"): layerID(id), rmin(r1), rmax(r2), density(rho), atomicMass(A), atomicNumber(Z), materialName(name) {}
     };
 
+    struct SubLayersUpdates
+    {
+        int LayerIndex;
+        int SubLayerIndex;
+        std::vector<int> blockids;
+        std::string NewMaterialName;
+        std::vector<double> blocks_As;
+        std::vector<double> blocks_Zs;
+        std::vector<double> blocks_densities;
+
+        SubLayersUpdates() = default;
+
+        SubLayersUpdates(int lidx, int slidx,
+                        const std::vector<int>& ids,
+                        const std::string& name,
+                        const std::vector<double>& As,
+                        const std::vector<double>& Zs,
+                        const std::vector<double>& densities)
+            : LayerIndex(lidx), SubLayerIndex(slidx),
+            blockids(ids), NewMaterialName(name),
+            blocks_As(As), blocks_Zs(Zs), blocks_densities(densities) {}
+    };
+
+    struct LayerConfig 
+    {
+    std::string layername;
+    int layerindex; 
+    double zenithbinning, azimuthbinning;
+    std::vector<SublayerConfig> sublayersconfig; // Sublayers composing this Earth layer
+    //std::vector<SubLayersUpdates> updates;
+
+    LayerConfig() = default; // Useful for STL containers or deferred initialization
+
+    LayerConfig(const std::string& name, int id, double dth, double dphi, const std::vector<SublayerConfig>& configs)
+        : layername(name), layerindex(id), zenithbinning(dth), azimuthbinning(dphi), sublayersconfig(configs) {}
+    };
+
     class Layer {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
     ///
@@ -225,10 +262,10 @@ namespace ModularEarth {
             //    - BuildLayer()
         
             Layer(std::string name = "DefaultLayer",
-            int id = 99,
+            int l_id = 99,
             double dthsize = 10.0,
             double dphisize = 10.0)
-            : layerID(id),
+            : layerID(l_id),
             layerName_string(std::move(name)),
             layerName(layerName_string + "_" + std::to_string(layerID)),
             dphi(dphisize),
@@ -378,9 +415,11 @@ namespace ModularEarth {
 
             void SubLayerBlockMap(int sl_id) const ;
 
+            void Call_The_Roll();
+
     };
 
-}
+;}
 
 
 #endif

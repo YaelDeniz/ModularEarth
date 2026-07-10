@@ -9,7 +9,10 @@
 #pragma link C++ namespace ModularEarth;
 #pragma link C++ class ModularEarth::Block+;
 #pragma link C++ class ModularEarth::Sublayer+;
-#pragma link C++ class ModularEarth::SublayerConfig+;
+#pragma link C++ struct ModularEarth::SublayerConfig+;
+#pragma link C++ struct ModularEarth::SubLayersUpdates+;
+#pragma link C++ struct ModularEarth::LayerConfig+;
 #pragma link C++ class ModularEarth::Layer+;
+#pragma link C++ class ModularEarth::Earth+;
 
 #endif

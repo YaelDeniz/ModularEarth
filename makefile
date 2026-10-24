@@ -18,7 +18,7 @@ HEADERS := $(filter-out inc/LinkDef.h, $(wildcard inc/*.h))
 SOURCES = $(wildcard $(SRCDIR)/*.C)
 OBJS    = $(patsubst $(SRCDIR)/%.C,$(BUILDDIR)/%.o,$(SOURCES))
 
-DICT_SRC = $(DICTDIR)/ModularEarthDict.cxx
+DICT_SRC = ModularEarthDict.cxx
 DICT_OBJ = $(BUILDDIR)/ModularEarthDict.o
 
 # ------------------------
@@ -35,7 +35,7 @@ $(DICTDIR):
 	mkdir -p $(DICTDIR)
 
 # Build ROOT dictionary
-$(DICT_SRC): $(HEADERS) | $(DICTDIR)
+$(DICT_SRC): $(HEADERS)
 	rootcling -f $@ -I$(INCDIR) $(HEADERS) $(INCDIR)/LinkDef.h
 
 $(DICT_OBJ): $(DICT_SRC) | $(BUILDDIR)
@@ -95,4 +95,4 @@ run: $(TARGET_LIB)
 
 
 clean:
-	rm -rf $(BUILDDIR) $(DICTDIR) *.so *.pcm
+	rm -rf $(BUILDDIR) $(DICTDIR) *.so *.pcm $(DICT_SRC)

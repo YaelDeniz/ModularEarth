@@ -5,14 +5,14 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 # --- read the csv ---
-df = pd.read_csv("tutorials/SubLayer_2_default.csv")
+df = pd.read_csv("./LowerMantle_3_1-SubLayer_1_1_BlockMap.csv")
 
 # --- set up the map ---
 fig, ax = plt.subplots(figsize=(12, 6))
 m = Basemap(projection='moll', lon_0=0, resolution='c', ax=ax)
 m.drawcoastlines(linewidth=0.5)
-m.drawparallels(range(-90, 91, 30), labels=[1,0,0,0])
-m.drawmeridians(range(-180, 181, 60), labels=[0,0,0,1])
+#m.drawparallels(range(-90, 91, 30), labels=[1,0,0,0])
+#m.drawmeridians(range(-180, 181, 60), labels=[0,0,0,1])
 
 # --- plot each block ---
 for block_id, group in df.groupby("block_id"):
@@ -23,6 +23,13 @@ for block_id, group in df.groupby("block_id"):
     phi2   = group["phi2"].iloc[0]
     theta1 = group["theta1"].iloc[0]
     theta2 = group["theta2"].iloc[0]
+
+    if block_id == 0:
+        dphi = abs(phi1-phi2)
+        dtheta = abs(theta1-theta2)
+        m.drawparallels(range(-90, 91, int(dphi)), labels=[1,0,0,0])
+        m.drawmeridians(range(-180, 181, int(dtheta)), labels=[0,0,0,1])
+        
 
     # convert to geographic coordinates
     lon1 = phi1 - 180;   lon2 = phi2 - 180

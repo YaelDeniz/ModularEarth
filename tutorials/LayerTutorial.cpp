@@ -22,6 +22,9 @@
 void LayerTutorial() {
     //Comparion with OscProbe
 
+    int dtheta = 20;
+    int dphi = 20;
+
     TMultiGraph * ThePaths = new TMultiGraph();
 
     TGraph * ModularEarthProfile = new TGraph();
@@ -72,7 +75,7 @@ void LayerTutorial() {
 
 
 
-    //Layer InnerCore("InnerCore",0,30,60); // Layer constructor indicating Layer name, index, lon bin size and lat bin size
+    //Layer InnerCore("InnerCore",0,dphi,dtheta); // Layer constructor indicating Layer name, index, lon bin size and lat bin size
     std::vector<ModularEarth::SublayerConfig> sublayersconfigIC = {{1,0, 1221.5, 12.9807, 0.4691, 1, "Iron"}}; //Struct containing the list of sublayers of a layer
     //syntax {sublayer index, rmin,rmax,Z,A,rho, material name}
     //InnerCore.SetSubLayers(sublayersconfigIC);
@@ -84,7 +87,7 @@ void LayerTutorial() {
     TGeoVolume* InnerCore = new TGeoVolume("InnerCore_1", new TGeoSphere("Sphere", 0, 1221.5), medIC);
 
     //
-    ModularEarth::Layer OuterCore("OuterCore",2,30,60);
+    ModularEarth::Layer OuterCore("OuterCore",2,dphi,dtheta);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigOC = {
         {1,1221.5, 1946.7, 11.9512, 0.4691, 1, "FeNi"},
         {2,1946.7, 2475.1, 11.4726, 0.4691, 1, "FeNi"},
@@ -95,7 +98,7 @@ void LayerTutorial() {
     OuterCore.SetSubLayers(sublayersconfigOC);
     OuterCore.BuildLayer();
 
-    ModularEarth::Layer LowerMantle("LowerMantle",3,30,60);
+    ModularEarth::Layer LowerMantle("LowerMantle",3,dphi,dtheta);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigLM = {
         {1,3480.0, 4476.0, 5.3225, 0.4954, 1, "SilicateLM"},
         {2,4476.0, 5378.4, 4.8332, 0.4691, 1, "SilicateLM"},
@@ -104,7 +107,7 @@ void LayerTutorial() {
     LowerMantle.SetSubLayers(sublayersconfigLM);
     LowerMantle.BuildLayer();
 
-    ModularEarth::Layer UpperMantle("UpperMantle",4,30,60);
+    ModularEarth::Layer UpperMantle("UpperMantle",4,dphi,dtheta);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigUM = {
         {1,5701.0, 5971.0, 3.8983	, 0.4954, 1, "SilicateUM"},
         {2,5971.0, 6346.6, 3.4306	, 0.4691, 1, "SilicateUM"},
@@ -120,7 +123,7 @@ void LayerTutorial() {
    
 
     // IDs of blocks you want to modify
-    std::vector<int> blockIDs = {3, 7, 12};
+    std::vector<int> blockIDs = {80, 81, 93};
 
     // New material properties for these blocks
     std::string newMaterialName = "AnomalousMantle";
@@ -143,7 +146,7 @@ void LayerTutorial() {
 
     LowerMantle.UpdateBlocksInSubLayer(
         1,
-        blockID1s,
+        blockIDs,
         newMaterialName,
         newA,
         newZ,
@@ -155,7 +158,7 @@ void LayerTutorial() {
 
     UpperMantle.UpdateBlocksInSubLayer(
         sublayerIndex,
-        blockIDs2,
+        blockIDs,
         newMaterialName,
         newA,
         newZ,
@@ -172,7 +175,7 @@ void LayerTutorial() {
 
     UpperMantle.BuildLayer();
 
-    ModularEarth::Layer Crust("Crust",5,30,60);
+    ModularEarth::Layer Crust("Crust",5,dphi,dtheta);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigC = {
         //{1,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"},
         {2,6356.0, 6368.0, 2.6000	, 0.4956, 1, "SilicateC"}
@@ -180,14 +183,14 @@ void LayerTutorial() {
     Crust.SetSubLayers(sublayersconfigC);
     Crust.BuildLayer();
 
-    ModularEarth::Layer Ocean("Ocean",6,30,60);
+    ModularEarth::Layer Ocean("Ocean",6,dphi,dtheta);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigO = {
         {1,6368.0, 6371.0, 1.0200	, 0.5525, 1, "SilicateO"}
     };
     Ocean.SetSubLayers(sublayersconfigO);
     Ocean.BuildLayer();
 
-    ModularEarth::Layer Atmosphere("Atmosphere",7,30,60);
+    ModularEarth::Layer Atmosphere("Atmosphere",7,dphi,dtheta);
 
       std::vector<ModularEarth::SublayerConfig> sublayersconfigAtm = {
         {1,6371.0, 6386.0	, 0.001	, 0.4991, 1, "Vac"}
@@ -205,7 +208,8 @@ void LayerTutorial() {
     top->AddNode(Ocean.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
     top->AddNode(Atmosphere.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
 
-  
+    
+    //SubLayerBlockMap
     LowerMantle.SubLayerBlockMap(1);
     UpperMantle.SubLayerBlockMap(sublayerIndex);
 

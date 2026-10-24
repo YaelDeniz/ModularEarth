@@ -21,19 +21,17 @@
 
 void EarthTutorial() {
 
-    //---------Create TOP volume
-    TGeoManager *geoManager = new TGeoManager("TopVol", "Earth in Sphere demo");
-    // Define vacuum for outer container
-    TGeoMaterial *matVac = new TGeoMaterial("Vacuum", 0, 0, 0);
-    TGeoMedium *medVac = new TGeoMedium("Vacuum", 1, matVac);
-    // Create top-level box (10x10x10 km)
-    //TGeoVolume *top = new TGeoVolume("TopBox", new TGeoBBox("Box", 5000, 5000, 5000), medVac);
-    TGeoVolume* top = new TGeoVolume("EarthTopSphere", new TGeoSphere("Sphere", 0, 7000), medVac);
-    geoManager->SetTopVolume(top);
-
-    ModularEarth::Earth ToyEarth("TestName","prem_44layers",10,10);
+    ModularEarth::Earth ToyEarth("TestName", "prem_44layers", 60, 60);
     ToyEarth.SetEarthModel("prem_44layers");
-    ToyEarth.GetConfigsSummary();
+    ToyEarth.GetModelSummary();
+    ToyEarth.BuiltEarth();
 
+    ToyEarth.GetGeoManager()->SetVisLevel(3);      // reach blocks at depth 4
+    //ToyEarth.GetGeoManager()->DefaultColors();     // unique color per material/layer
+    ToyEarth.GetTopVolume()->SetVisibility(kFALSE); // hide outer sphere so layers show through
+
+    TCanvas *c = new TCanvas("c", "EarthTutorial", 1200, 900);
+    ToyEarth.GetTopVolume()->Draw("gl");
+    c->Update();
 
 }

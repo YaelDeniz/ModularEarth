@@ -24,98 +24,151 @@
 
 namespace ModularEarth {
 
-    // Parse Earth model from file (rmax, ρ, Z/A, index)
-    void Earth::SetEarthModel(TString table_name) {
+// SetEarthModel — reads a PREM-format table from ModularEarth/tables/<file_name>.txt and
+// generates the corresponding LayerConfig and SublayerConfig objects for the Earth model.
+//
+// .txt file format (one row per radial shell boundary):
+//
+//   "Outer Boundary[km]"  "Massrho_sl[g/cm³]"  "Z/A"  "Major Layer Index"
+//
+// Each row defines the OUTER boundary of one sublayer. The inner boundary
+// is carried forward from the previous row (starting at 0 for the first row).
+// SublayerConfig objects are created for each row
+// SublayerConfig objects are grouped into LayerConfig objects based on the Major Layer Index.
+// When the index a major layer changes between rows, the accumulated sublayers are
+// stored in a LayerConfig object and the sublayer list is reset for the sets of sublayers
+// beloging to the new next major layer.
 
-        TString ModularEarthDir = gSystem->pwd();
-        TString ModelTableDir = ModularEarthDir + "/tables/";
-        std::string filename;
-        if (table_name.IsNull()){
-        
-        //convert TString to string
+    void Earth::SetEarthModel(TString premtable) {
 
-        TString TablePath = ModelTableDir + TableName + ".txt";
-        filename=TablePath.Data(); //Assign default name
+        std::string PATH_table;
+        if (premtable.IsNull()){
+            PATH_table = (PATH_premdir + premtable_default + ".txt").Data();
         }
+
         else
         {
-
-        TString TablePath = ModelTableDir + table_name + ".txt";
-        filename=TablePath.Data();
-
+            PATH_table = (PATH_premdir + premtable + ".txt").Data();
         }
 
-        std::ifstream infile(filename);
+        std::ifstream infile(PATH_table);
         if (!infile) {
-            std::cerr << "ERROR: Could not open model file: " << filename << std::endl;
+            std::cerr << "ERROR: Could not open model file: " << PATH_table << std::endl;
             return;
         }
 
         std::string line;
-        double radiusprev = 0.0;
-        int indexprev = -1;
-        int slindex = 1;
+        double r_sly = 0.0;
+        int ly_prev = -1;
+        int sly = 1;
 
         while (std::getline(infile, line)) {
             std::istringstream iss(line);
-            double radius, density, z_a;
-            int index;
+            double R_sly, rho_sly, zoa_sly;
+            int ly;
 
-            if (!(iss >> radius >> density >> z_a >> index)) {
+            if (!(iss >> R_sly >> rho_sly >> zoa_sly >> ly)) {
                 std::cerr << "WARNING: Invalid line skipped: " << line << std::endl;
                 continue;
             }
 
-            if (index != indexprev && indexprev != -1) {
-                layersconfigs.push_back({"Layer", indexprev+1, theta_width, phi_width, sublayersconfigs});
-                sublayersconfigs.clear();
-                slindex = 1;
+            //If the index changes, it indicates a new major geological layer. 
+            // Store the previous layer's sublayer configurations and reset for the new layer. 
+            if (ly != ly_prev && ly_prev != -1) {
+                // Commit the  layer's sublayer configurations 
+                layersconfigs.push_back({"Layer", ly_prev+1, dth, dphi, sublayersconfigs});
+                sublayersconfigs.clear(); // Reset sublayer configurations for a new major layer
+                sly = 1; // Reset sublayer index for a new major layer
             }
 
-            sublayersconfigs.push_back({slindex, radiusprev, radius, density, a_mass, z_a, "SublayerMaterial"});
-            radiusprev = radius;
-            indexprev = index;
-            slindex++;
+            // Add sublayer configuration defining the current major geological layer with index 
+            sublayersconfigs.push_back({sly, r_sly, R_sly, rho_sly, a_mass, zoa_sly, "SublayerMaterial"});
+            r_sly = R_sly;
+            ly_prev = ly;
+            sly++;
         }
 
         if (!sublayersconfigs.empty()) {
-            layersconfigs.push_back({"Layer", indexprev+1, theta_width, phi_width, sublayersconfigs});
+            layersconfigs.push_back({"Layer", ly_prev+1, dth, dphi, sublayersconfigs});
         }
     }
 
-    void Earth::GetConfigsSummary() const {
+    
+
+    void Earth::GetModelSummary() const {
         if (layersconfigs.empty()) {
-            std::cout << "No layer configuration loaded in the current Earth model.\n"
+            std::cout << "No layer configuration set for the current Earth model.\n"
                     << "Use Earth::SetEarthModel to load a predefined model, "
-                    << "or add layers before calling the config summary.\n";
+                    << "or add layers before calling the layer summary.\n";
             return;
         }
 
         for (size_t ly = 0; ly < layersconfigs.size(); ++ly) {
-            const auto& layer = layersconfigs[ly];
+            const auto& layer_config = layersconfigs[ly];
 
-            std::cout << "\n--- Layer index: " << ly << "Index check: " << layer.layerindex << " ---\n";
+            std::cout << "\n--- Layer index: " << ly << "Index check: " << layer_config.layerindex << " ---\n";
 
-            if (layer.sublayersconfig.empty()) {
+            if (layer_config.sublayersconfig.empty()) {
                 std::cout << "  Incomplete configuration: no sublayers in this layer. "
                         << "Please redo the configs.\n";
                 continue;
             }
 
-            for (const auto& slcfg : layer.sublayersconfig) {
-                std::cout << "  Sublayer " << slcfg.layerID
-                        << " | rmin: " << slcfg.rmin
-                        << " | rmax: " << slcfg.rmax
-                        << " | \u03c1: "   << slcfg.density
-                        << " | Z/A: " << slcfg.atomicMass << "\n";
+            for (const auto& slayer_config : layer_config.sublayersconfig) {
+                std::cout << "  Sublayer " << slayer_config.layerID
+                        << " | rmin: " << slayer_config.rmin
+                        << " | rmax: " << slayer_config.rmax
+                        << " | \u03c1: "   << slayer_config.density
+                        << " | Z/A: " << slayer_config.atomicNumber << "\n";
             }
         }
     }
 
+    void Earth::BuiltEarth() {
+
+        if (layersconfigs.empty()) {
+            std::cout << "No layer configuration set for the current Earth model.\n"
+                    << "Use Earth::SetEarthModel to load a predefined model, "
+                    << "or add layers before attempting to build the Earth.\n";
+            return;
+        }
+
+        // Reserve upfront so emplace_back never reallocates while we hold references.
+        earthlayers.reserve(layersconfigs.size());
+
+        for (size_t ly = 0; ly < layersconfigs.size(); ++ly) {
+            const auto& layer_config = layersconfigs[ly];
+
+            if (layer_config.sublayersconfig.empty()) {
+                std::cout << "  Incomplete configuration: no sublayers in layer " << ly
+                        << ". Skipping.\n";
+                continue;
+            }
+
+            // Construct the Layer directly inside earthlayers (avoids copying raw pointers).
+            earthlayers.emplace_back("Layer", static_cast<int>(ly), dphi, dth);
+            Layer& MajorLayer = earthlayers.back();
+            MajorLayer.SetSubLayers(layer_config.sublayersconfig);
+            MajorLayer.BuildLayer();
+            top->AddNode(MajorLayer.GetLayerVolume(), static_cast<int>(ly) + 1,
+                         new TGeoTranslation(0, 0, 0));
+        }
+
+        geoManager->CloseGeometry();
+
+        // Attempt 2: via CLING interpreter (bypasses cppyy dispatch)
+        // ret = ROOT.gROOT.ProcessLine("gGeoManager->CloseGeometry();")
+        // println("ProcessLine return: ", ret)
+        // println("IsClosed after: ", pyconvert(Bool, geo.IsClosed()))
+    }
+
+
+
+
     // Change angular resolution (before building Earth)
-    void Earth::SetEarthBinning(double dth, double dphi) {
-        theta_width = dth;
-        phi_width = dphi;
+    void Earth::SetBlockSizes(double dth, double dphi) {
+        this->dth = dth;
+        this->dphi = dphi;
     }
 
     

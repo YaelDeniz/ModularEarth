@@ -65,13 +65,17 @@ namespace ModularEarth {
         std::vector<Layer> earthlayers;
 
         // Global Earth model defaults
-        TString EarthName;
-        double theta_width = 10.0;
-        double phi_width = 10.0;
+        TString earth_name = "NewEarthModel";
+        double dth = 10.0;
+        double dphi = 10.0;
         double a_mass = 1.0;
 
-        TString TableName="PREM_REFERENCE"; // filename containing PREM table models
-
+        
+        TString PATH_modularearth = gSystem->pwd();
+        TString PATH_premdir=PATH_modularearth + "/PremTables/"; // path to PREM table models
+        TString premtable_default="PREM_DEFAULT"; // filename containing PREM table models
+        TString premtable; // filename containing PREM table models
+        
         TPolyMarker3D *NuDetMarkers = nullptr;
         TPolyLine3D* nuLine = nullptr;
 
@@ -81,24 +85,58 @@ namespace ModularEarth {
 
     public:
      
-    Earth(TString earth_name = "NewEarthModel", 
-            TString table_name = "PREM_REFERENCE",
-            double delta_theta  = 10.0,
-            double delta_phi = 10.0)
-            : EarthName(earth_name),
-            TableName(table_name),
-            theta_width(delta_theta),
-            phi_width(delta_phi)
-            {}
+    Earth(TString earth_name = "NewEarthModel",
+            TString premtable = "PREM_DEFAULT",
+            double dth  = 10.0,
+            double dphi = 10.0)
+            : earth_name(earth_name),
+            premtable(premtable),
+            dth(dth),
+            dphi(dphi) {
+        geoManager = new TGeoManager(this->earth_name, this->earth_name + " Earth Model");
+        matVac     = new TGeoMaterial("Vacuum", 0, 0, 0);
+        medVac     = new TGeoMedium("Vacuum", 1, matVac);
+        top        = new TGeoVolume("EarthTopSphere", new TGeoSphere("Sphere", 0, 7000), medVac);
+        geoManager->SetTopVolume(top);
+    }
 
-        // Parse Earth model from file (rmax, ρ, Z/A, index)
-        void SetEarthModel(TString table_name); 
+        // Parse Earth model from prem tables (rmax, ρ, Z/A, layer index)
+        void SetEarthModel(TString premtable);
 
-        void GetConfigsSummary() const;
+        void SetBlockSizes(double dth, double dphi);
 
-        // Change angular resolution (before building Earth)
-        void SetEarthBinning(double dth, double dphi);
+        // Build the full ROOT geometry tree from the loaded PREM configuration
+        void BuiltEarth();
+
+        void GetModelSummary() const;
+
+        TGeoManager* GetGeoManager() const { return geoManager; }
+        TGeoVolume*  GetTopVolume()  const { return top; }
+
+
     };
 };
+/*
 
+// Define the Earth's blocks size
+        void SetBlockSizes(double dth, double dphi);
+
+        void SetEarthBins(double nbins_th, double nbins_phi);
+
+        // Load manually all the layers and sublayers for the Earth model
+        void SetEarthLayers(std::vector<LayerConfig> layersconfigs);
+        
+        // Update material properties of a specific sublayer within a specific layer
+        void UpdateSublayerMaterial(int layer_index, int sublayer_index, double new_density, double new_a_mass, double new_z_a);
+        
+        // Update material properties of a specific set of blocks within a specific sublayer
+        void UpdateBlocksInSubLayer(size_t sublayerIndex,
+                const std::vector < int > & blockIDs,
+                    const std::string & newName,
+                        const std::vector < double > & newA,
+                            const std::vector < double > & newZ,
+                                const std::vector < double > & newDensity) ; 
+
+
+*/
 #endif

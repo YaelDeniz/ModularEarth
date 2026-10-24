@@ -1,7 +1,11 @@
 # Compiler and ROOT flags
+
 CXX      = g++
-CXXFLAGS = -O2 -Wall -fPIC -std=c++17 $(shell root-config --cflags)
+CXXFLAGS = -O2 -Wall -fPIC -std=c++17 $(shell root-config --cflags) 
+#CXXFLAGS += -DMODULAR_EARTH_DIR="$(CURDIR)"
 LDFLAGS  = $(shell root-config --libs)
+
+#$(info CXXFLAGS = $(CXXFLAGS))
 
 INCDIR   = inc
 SRCDIR   = src

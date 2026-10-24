@@ -39,11 +39,15 @@ void SubLayerTutorial() {
     TGeoVolume* top = new TGeoVolume("EarthTopSphere", new TGeoSphere("Sphere", 0, 7000), medVac);
     geoManager->SetTopVolume(top);
 
+    double dtheta = 20;
+    double dphi = 20;
+
+
     //Test SubLayer
     ModularEarth::Sublayer TestSubLayer1;
     TestSubLayer1.SetSubLayerID(1); //Set SubLayer Idex
     TestSubLayer1.SetSubLayerMaterial("TestMaterial1", 1,1,0.5); //Sublayer Material must be defined before creating sublayer volume
-    TestSubLayer1.CreateSubLayerBlocks(3480,3880,60,30); //Create a sublayer given their inner and outer radius and lon and lat bin size
+    TestSubLayer1.CreateSubLayerBlocks(3480,3880,dtheta,dphi); //Create a sublayer given their inner and outer radius and lon and lat bin size
     TestSubLayer1.BuildSubLayer(); // Build the layer
 
     top->AddNode(TestSubLayer1.GetSubLayerVolume() , 1, new TGeoTranslation(0, 0, 0));// GetSubLayerVolume return the actual TGeoManager Volume, this need to be add to the top volume or to anothr TGeoAssembly.
@@ -51,7 +55,7 @@ void SubLayerTutorial() {
     ModularEarth::Sublayer TestSubLayer2;
     TestSubLayer2.SetSubLayerID(2); //Set SubLayer Idex
     TestSubLayer2.SetSubLayerMaterial("TestMaterial2", 2,3,23.4); //Sublayer Material must be defined before creating sublayer volume
-    TestSubLayer2.CreateSubLayerBlocks(3880,4680,60,30); //Create a sublayer given their inner and outer radius and lon and lat bin size
+    TestSubLayer2.CreateSubLayerBlocks(3880,4680,dtheta,dphi); //Create a sublayer given their inner and outer radius and lon and lat bin size
     TestSubLayer2.BuildSubLayer(); // Build the layer
 
     top->AddNode(TestSubLayer2.GetSubLayerVolume(), 2, new TGeoTranslation(0, 0, 0));// GetSubLayerVolume return the actual TGeoManager Volume, this need to be add to the top volume or to anothr TGeoAssembly.

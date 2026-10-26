@@ -93,36 +93,40 @@ namespace ModularEarth {
         }
     }
 
-    
+    void Earth::SetSublayerUpdates(int i_ly, // Index of the target Major Layer
+                int i_sly, // Index of the target Sublayer whithin the Major Layer
+                    double rho_sly, // New density of the target Sublayer
+                            double eyield_sly,
+                        const std::string& UpdateMaterialName) // new electron yield , Ye = \sum w_i x (Z/A)_i, of the target Sublayer
+    {
 
-    void Earth::GetModelSummary() const {
-        if (layersconfigs.empty()) {
-            std::cout << "No layer configuration set for the current Earth model.\n"
-                    << "Use Earth::SetEarthModel to load a predefined model, "
-                    << "or add layers before calling the layer summary.\n";
+        if (!earthlayers.empty()) {
+            std::cerr << "Warning: Earth already built. Call SetSublayerUpdates before BuiltEarth().\n";
+            return;
+        }
+        
+        if (i_ly < 0 || i_ly >= static_cast<int>(layersconfigs.size())) {
+            std::cerr << "Error: Major layer index " << i_ly << " is out of bounds." << std::endl;
             return;
         }
 
-        for (size_t ly = 0; ly < layersconfigs.size(); ++ly) {
-            const auto& layer_config = layersconfigs[ly];
+        const auto& targetLayer = layersconfigs[i_ly];
 
-            std::cout << "\n--- Layer index: " << ly << "Index check: " << layer_config.layerindex << " ---\n";
-
-            if (layer_config.sublayersconfig.empty()) {
-                std::cout << "  Incomplete configuration: no sublayers in this layer. "
-                        << "Please redo the configs.\n";
-                continue;
-            }
-
-            for (const auto& slayer_config : layer_config.sublayersconfig) {
-                std::cout << "  Sublayer " << slayer_config.layerID
-                        << " | rmin: " << slayer_config.rmin
-                        << " | rmax: " << slayer_config.rmax
-                        << " | \u03c1: "   << slayer_config.density
-                        << " | Z/A: " << slayer_config.atomicNumber << "\n";
-            }
+        if (i_sly < 0 || i_sly >= static_cast<int>(layersconfigs[i_ly].sublayersconfig.size())) {
+            std::cerr << "Error: Sublayer index " << i_sly << " is out of bounds for major layer " << i_ly << "." << std::endl;
+            return;
         }
-    }
+
+        layersconfigs[i_ly].sublayersconfig[i_sly].density = rho_sly;
+        layersconfigs[i_ly].sublayersconfig[i_sly].atomicMass = 1.0; // Assuming electronYield is
+        layersconfigs[i_ly].sublayersconfig[i_sly].atomicNumber = eyield_sly; // Assuming electronYield is
+        layersconfigs[i_ly].sublayersconfig[i_sly].materialName = UpdateMaterialName; // Optional: Update material name to reflect changes
+
+    } 
+
+    
+
+
 
     void Earth::BuiltEarth() {
 
@@ -160,6 +164,35 @@ namespace ModularEarth {
         // ret = ROOT.gROOT.ProcessLine("gGeoManager->CloseGeometry();")
         // println("ProcessLine return: ", ret)
         // println("IsClosed after: ", pyconvert(Bool, geo.IsClosed()))
+    }
+
+        void Earth::GetModelSummary() const {
+        if (layersconfigs.empty()) {
+            std::cout << "No layer configuration set for the current Earth model.\n"
+                    << "Use Earth::SetEarthModel to load a predefined model, "
+                    << "or add layers before calling the layer summary.\n";
+            return;
+        }
+
+        for (size_t ly = 0; ly < layersconfigs.size(); ++ly) {
+            const auto& layer_config = layersconfigs[ly];
+
+            std::cout << "\n--- Layer index: " << ly << "Index check: " << layer_config.layerindex << " ---\n";
+
+            if (layer_config.sublayersconfig.empty()) {
+                std::cout << "  Incomplete configuration: no sublayers in this layer. "
+                        << "Please redo the configs.\n";
+                continue;
+            }
+
+            for (const auto& slayer_config : layer_config.sublayersconfig) {
+                std::cout << "  Sublayer " << slayer_config.layerID
+                        << " | rmin: " << slayer_config.rmin
+                        << " | rmax: " << slayer_config.rmax
+                        << " | \u03c1: "   << slayer_config.density
+                        << " | Z/A: " << slayer_config.atomicNumber << "\n";
+            }
+        }
     }
 
     void Earth::BuildGeometry() {

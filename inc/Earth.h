@@ -61,7 +61,7 @@ namespace ModularEarth {
         // Internal configuration
         std::vector<LayerConfig> layersconfigs;
         std::vector<SublayerConfig> sublayersconfigs;
-        std::vector<SubLayersUpdates> sublayerupdates;
+        //std::vector<SubLayersUpdates> sublayerupdates;
         std::vector<Layer> earthlayers;
 
         // Global Earth model defaults
@@ -104,6 +104,32 @@ namespace ModularEarth {
         void SetEarthModel(TString premtable);
 
         void SetBlockSizes(double dth, double dphi);
+
+        void SetEarthLayers(std::vector<LayerConfig> layersconfigs); // Load manually all the layers and sublayers for the Earth model
+
+        /*
+        void SetSublayerUpdates(int i_ly, // Index of the target Major Layer
+                int i_sly, // Index of the target Sublayer whithin the Major Layer
+                    double rho_sly, // New density of the target Sublayer
+                        double a_mass_sly, // new atomic mass of the target Sublayer
+                            double z_sly); // new atomic number of the target Sublayer
+        */
+        
+        void SetSublayerUpdates(int i_ly, // Index of the target Major Layer
+                int i_sly, // Index of the target Sublayer whithin the Major Layer
+                    double rho_sly, // New density of the target Sublayer
+                            double eyield_sly,
+                        const std::string& UpdateMaterialName = "UpdatedSublayerMaterial"); // new electron yield , Ye = \sum w_i x (Z/A)_i, of the target Sublayer
+        
+        
+        // Update material properties of a specific set of blocks within a specific sublayer
+        void SetBlocksUpdates(size_t sublayerIndex,
+                const std::vector < int > & blockIDs,
+                    const std::string & newName,
+                        const std::vector < double > & newA,
+                            const std::vector < double > & newZ,
+                                const std::vector < double > & newDensity) ;
+
 
         // Build the full ROOT geometry tree from the loaded PREM configuration
         void BuiltEarth();

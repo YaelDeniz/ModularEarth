@@ -80,7 +80,7 @@ namespace ModularEarth {
         TPolyLine3D* nuLine = nullptr;
 
         //void function for Intersection calculation
-
+        void BuildGeometry();
         //
 
     public:
@@ -107,12 +107,10 @@ namespace ModularEarth {
 
         // Build the full ROOT geometry tree from the loaded PREM configuration
         void BuiltEarth();
-
         void GetModelSummary() const;
 
         TGeoManager* GetGeoManager() const { return geoManager; }
         TGeoVolume*  GetTopVolume()  const { return top; }
-
 
     };
 };

@@ -154,7 +154,7 @@ namespace ModularEarth {
                          new TGeoTranslation(0, 0, 0));
         }
 
-        geoManager->CloseGeometry();
+        this->BuildGeometry();
 
         // Attempt 2: via CLING interpreter (bypasses cppyy dispatch)
         // ret = ROOT.gROOT.ProcessLine("gGeoManager->CloseGeometry();")
@@ -162,8 +162,20 @@ namespace ModularEarth {
         // println("IsClosed after: ", pyconvert(Bool, geo.IsClosed()))
     }
 
+    void Earth::BuildGeometry() {
+        if (geoManager == nullptr) {
+            std::cerr << "Error: TGeoManager is not initialized. Cannot build geometry." << std::endl;
+            return;
+        }
 
+        if (top == nullptr) {
+            std::cerr << "Error: Top Volume is not constructed. Cannot build geometry." << std::endl;
+            return;
+        }
 
+        geoManager->CloseGeometry();
+
+    }
 
     // Change angular resolution (before building Earth)
     void Earth::SetBlockSizes(double dth, double dphi) {

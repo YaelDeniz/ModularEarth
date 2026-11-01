@@ -38,8 +38,6 @@ namespace ModularEarth {
         if (SubLayer) delete SubLayer;
         SubLayer = new TGeoVolumeAssembly(SubLayerName.c_str());
 
-        static TGeoTranslation * sharedTranslation = new TGeoTranslation(0, 0, 0);
-        // Alternative: TGeoTranslation * sharedTranslation = new TGeoTranslation(0, 0, 0);
         for (const auto & b: blocks) {
             if (b.GetVolume() == nullptr) {
                 std::cerr << "Block is empty volume!\n";
@@ -50,14 +48,20 @@ namespace ModularEarth {
 
                 b.BlockSummary();
             }
-            SubLayer -> AddNode(b.GetVolume(), b.GetBlockID(), sharedTranslation);
+            SubLayer -> AddNode(b.GetVolume(), b.GetBlockID(), new TGeoTranslation(0, 0, 0));
         }
         }
 
-    // Set SubLayer ID. SubLayers are name based on their ID (e.g., "SubLayer_#ID")
+    void Sublayer::SetSubLayerIndex(int i_sly_, int i_ly_) {
+        i_sly = i_sly_;
+        i_ly  = i_ly_;
+        SubLayerName = Form("SubLayer_%d_%d", i_ly, i_sly);
+    }
+
+    // Deprecated: sets i_sly only, leaves i_ly = 0 (unassigned).
     void Sublayer::SetSubLayerID(int id) {
-        SubLayerID = id;
-        SubLayerName = Form("SubLayer_%d", SubLayerID);
+        i_sly = id;
+        SubLayerName = Form("SubLayer_%d_%d", i_ly, i_sly);
     }
 
     // ------------------------------------------------------------------
@@ -71,10 +75,20 @@ namespace ModularEarth {
     ///   dth: Longitude range [degrees]
     ///   dph: Latitud range [degrees]
     void Sublayer::CreateSubLayerBlocks(double r1, double r2, double dphi, double dth) {
-            //Error: size of bin does not correpond to integer number of bins
-            int Nphi = 360 / dphi;
-            int Nth = 180 / dth;
-            int blockID = 1;
+            // Innermost sublayer (r1=0): single full sphere avoids degenerate overlapping
+            // wedges at the center that confuse ROOT's geometry navigator.
+            if (r1 < 1e-10) {
+                Block block;
+                block.SetBlockGeometry(0.0, r2, 0.0, 180.0, 0.0, 360.0, 1, i_ly, i_sly);
+                block.DefineBlockMaterial(SubLayerMaterialName, SubLayerA, SubLayerZ, SubLayerDensity);
+                block.BuildBlock(i_sly);
+                blocks.push_back(block);
+                return;
+            }
+
+            int Nphi  = 360 / dphi;
+            int Nth   = 180 / dth;
+            int i_blk = 1;
 
             for (int i = 0; i < Nth; ++i) {
                 double th1 = i * dth;
@@ -85,11 +99,11 @@ namespace ModularEarth {
                     double phi2 = (j + 1) * dphi;
 
                     Block block;
-                    block.SetBlockGeometry(r1, r2, th1, th2, phi1, phi2, blockID);
+                    block.SetBlockGeometry(r1, r2, th1, th2, phi1, phi2, i_blk, i_ly, i_sly);
                     block.DefineBlockMaterial(SubLayerMaterialName, SubLayerA, SubLayerZ, SubLayerDensity);
-                    block.BuildBlock(SubLayerID); // color hint from ID
+                    block.BuildBlock(i_sly);
                     blocks.push_back(block);
-                    blockID++;
+                    i_blk++;
                 }
             }
         }
@@ -206,11 +220,11 @@ namespace ModularEarth {
     }
 
     void Sublayer::GetSubLayerSummary() {
-    std::cout << "SubLayer Index: " << SubLayerID << "\n"
-            << "SubLayer Name: " << SubLayerName << "\n"
-            << "Number of Blocks: " << blocks.size() << "\n"
-            << "Sublayer Updates: Full(" << std::boolalpha << FullUpdate
-            << ") Blocks(" << BlocksUpdate << ")" << std::endl;
+        std::cout << "Sublayer Index:   (" << i_ly << ", " << i_sly << ")  [i_ly, i_sly]\n"
+                  << "SubLayer Name:    " << SubLayerName << "\n"
+                  << "Number of Blocks: " << blocks.size() << "\n"
+                  << "Sublayer Updates: Full(" << std::boolalpha << FullUpdate
+                  << ") Blocks(" << BlocksUpdate << ")" << std::endl;
         }
 
 

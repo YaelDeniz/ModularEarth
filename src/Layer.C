@@ -28,7 +28,7 @@ namespace ModularEarth {
 
         for (const auto & cfg: configs) {
             Sublayer sub;
-            sub.SetSubLayerID(cfg.layerID);
+            sub.SetSubLayerIndex(cfg.sublayerID, i_ly);
             sub.SetSubLayerMaterial(cfg.materialName, cfg.atomicMass, cfg.atomicNumber, cfg.density);
             sub.CreateSubLayerBlocks(cfg.rmin, cfg.rmax, dphi, dth);
             sublayers.push_back(sub);
@@ -88,10 +88,9 @@ namespace ModularEarth {
     }
 
     void Layer::BuildLayer() {
-        int id = 1;
         for (auto & sl: sublayers) {
             sl.BuildSubLayer();
-            layerVolume -> AddNode(sl.GetSubLayerVolume(), id++);
+            layerVolume->AddNode(sl.GetSubLayerVolume(), sl.GetSubLayerIndex());
         }
     }
 
@@ -158,31 +157,24 @@ namespace ModularEarth {
     void Layer::SubLayerBlockMap( int sl_id) const
     {
 
-        // NOTE: This function assumes that layerID  in ModularEarth is 1-based, while ROOT's TGeoManager uses 0-based indexing for nodes.
-        // Then this function adjusts for that by subtracting 1 from the layerID when accessing the top volume's nodes.
-
-        // NOTE: This function assumes that sl_id in ModularEarth is 1-based, while ROOT's TGeoManager uses 0-based indexing for nodes.
-
-        // GetTopNode() gives the top node — not GetNode(0) which searches the current branch
         TGeoNode* TopNode = gGeoManager->GetTopNode();
-
         TString TopNode_path = TString("/") + TopNode->GetName();
 
-        //TGeoVolume* volume 
         TGeoVolume* Top = gGeoManager->GetTopVolume();
+        int nDaughters_top = Top->GetNdaughters();
 
-        int nDaughters_top = Top->GetNdaughters(); // Number of Layers in the top volume.
+        printf("Total layers in top volume: %i\n", nDaughters_top);
+        printf("This Layer's index (i_ly): %i\n", i_ly);
 
-        printf("Total number of layers in TOP (# OF layers): %i\n", nDaughters_top);
-        
-        printf("This Layer's LayerID: %i\n", layerID); 
-
-        int LayerNodeID = layerID - 1; // Adjust for 0-based indexing in ROOT's TGeoManager
-
-        TGeoNode* LayerNode = Top->GetNode(LayerNodeID); // 0-based vs 1-based indexing for LayerID?
+        // Find layer node by copy number (robust against skipped layers).
+        TGeoNode* LayerNode = nullptr;
+        for (int k = 0; k < nDaughters_top; ++k) {
+            TGeoNode* n = Top->GetNode(k);
+            if (n && n->GetNumber() == i_ly) { LayerNode = n; break; }
+        }
 
         if (!LayerNode) {
-            printf("  WARNING: LayerNode is null for LayerID %d\n", layerID);
+            printf("  WARNING: LayerNode is null for i_ly %d\n", i_ly);
             return;
         }
 
@@ -209,12 +201,21 @@ namespace ModularEarth {
             }
 
             else {
-                int SubLayerNode_id = sl_id - 1; //
+                // Find sublayer node by copy number (robust against non-sequential IDs).
+                TGeoNode* SubLayerNode = nullptr;
+                int SubLayerPos = -1;
+                for (int k = 0; k < nDaughters_in_layer; ++k) {
+                    TGeoNode* n = LayerAssembly->GetNode(k);
+                    if (n && n->GetNumber() == sl_id) { SubLayerNode = n; SubLayerPos = k; break; }
+                }
 
-                TGeoNode* SubLayerNode = LayerAssembly->GetNode(SubLayerNode_id);
+                if (!SubLayerNode) {
+                    printf("  WARNING: SubLayerNode not found for sl_id %d\n", sl_id);
+                    return;
+                }
 
                 TString SubLayerNode_name = SubLayerNode->GetName();
-                
+
                 TString SubLayerNode_path =  LayerNode_path + TString("/") + SubLayerNode_name;
 
                 printf("SUBLAYER node name [%d]: %s\n", sl_id, SubLayerNode_name.Data());
@@ -223,7 +224,7 @@ namespace ModularEarth {
 
                 TString filename = LayerNode_name + "-" + SubLayerNode_name + "_BlockMap.csv";
 
-                sublayers[SubLayerNode_id].GetBlockVertices(gGeoManager, SubLayerNode_path,filename);
+                sublayers[SubLayerPos].GetBlockVertices(gGeoManager, SubLayerNode_path, filename);
             }
         }
     } //SubLayerBlockMap

@@ -14,5 +14,7 @@
 #pragma link C++ struct ModularEarth::LayerConfig+;
 #pragma link C++ class ModularEarth::Layer+;
 #pragma link C++ class ModularEarth::Earth+;
+#pragma link C++ struct ModularEarth::PathSegment+;
+#pragma link C++ class ModularEarth::EarthPaths+;
 
 #endif

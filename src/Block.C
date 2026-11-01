@@ -34,35 +34,43 @@ namespace ModularEarth {
         SubLayerModified = status;
     }
 
-    int Block::GetBlockID() const {
-        return blockID;
-    }
+    int Block::GetBlockIndex() const { return i_blk; }
+    int Block::GetSublayerIndex() const { return i_sly; }
+    int Block::GetLayerIndex() const { return i_ly; }
+    int Block::GetBlockID() const { return i_blk; } // deprecated alias
 
-    void Block::SetBlockGeometry(double r1, double r2,
+    void Block::SetBlockGeometry(double r, double R,
                                 double theta1, double theta2,
                                 double phi1, double phi2,
-                                int id) {
-        rmin = r1;
-        rmax = r2;
+                                int i_blk_, int i_ly_, int i_sly_) {
+        rmin     = r;
+        rmax     = R;
         thetamin = theta1;
         thetamax = theta2;
-        phimin = phi1;
-        phimax = phi2;
-        blockID = id;
+        phimin   = phi1;
+        phimax   = phi2;
+        i_blk    = i_blk_;
+        i_ly     = i_ly_;
+        i_sly    = i_sly_;
     }
 
     void Block::DefineBlockMaterial(const std::string& name, double A, double Z, double rho) {
         materialName = name;
-        atomicMass = A;
+        atomicMass   = A;
         atomicNumber = Z;
-        density = rho;
+        density      = rho;
 
         // Clean any previous material/medium if you re-define
         delete blockMedium;   blockMedium = nullptr;
         delete blockMaterial; blockMaterial = nullptr;
 
-        blockMaterial = new TGeoMaterial(name.c_str(), A, Z, rho);
-        blockMedium   = new TGeoMedium(name.c_str(), blockID, blockMaterial);
+        // ROOT-registered names encode the full hierarchical address so they are
+        // globally unique across the model. The user-supplied name is preserved in
+        // materialName for summaries and material-property lookups.
+        std::string rootName = Form("BlockMat_%d_%d_%d", i_ly, i_sly, i_blk);
+        blockMaterial = new TGeoMaterial(rootName.c_str(), A, Z, rho);
+        blockMedium   = new TGeoMedium(Form("BlockMed_%d_%d_%d", i_ly, i_sly, i_blk),
+                                       i_blk, blockMaterial);
     }
 
     void Block::BuildBlock(int /*colorid*/) {
@@ -80,10 +88,10 @@ namespace ModularEarth {
         delete block;
         block = nullptr;
 
-        TGeoShape* shape = new TGeoSphere(Form("BlockShape_%d", blockID),
+        TGeoShape* shape = new TGeoSphere(Form("BlockShape_%d_%d_%d", i_ly, i_sly, i_blk),
                                         rmin, rmax, thetamin, thetamax, phimin, phimax);
 
-        block = new TGeoVolume(Form("BlockVolume_%d", blockID), shape, blockMedium);
+        block = new TGeoVolume(Form("BlockVol_%d_%d_%d", i_ly, i_sly, i_blk), shape, blockMedium);
         block->SetVisibility(kTRUE);
 
         if (BlockModified) {
@@ -144,7 +152,7 @@ namespace ModularEarth {
 
     void Block::BlockSummary() const {
         std::cout << "=== Block Summary ===\n";
-        std::cout << "  Block ID:        " << blockID << "\n";
+        std::cout << "  Block Index:     (" << i_ly << ", " << i_sly << ", " << i_blk << ")  [i_ly, i_sly, i_blk]\n";
         std::cout << "  Block Name:      " << (block ? block->GetName() : "N/A") << "\n";
 
         if (block && block->GetShape() && block->GetShape()->IsA() == TGeoSphere::Class()) {

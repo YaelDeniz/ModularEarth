@@ -111,7 +111,7 @@ void LayerTutorial() {
     std::vector<ModularEarth::SublayerConfig> sublayersconfigUM = {
         {1,5701.0, 5971.0, 3.8983	, 0.4954, 1, "SilicateUM"},
         {2,5971.0, 6346.6, 3.4306	, 0.4691, 1, "SilicateUM"},
-        {1,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"}
+        {3,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"}
     };
     UpperMantle.SetSubLayers(sublayersconfigUM);
 
@@ -178,7 +178,7 @@ void LayerTutorial() {
     ModularEarth::Layer Crust("Crust",5,dphi,dtheta);
     std::vector<ModularEarth::SublayerConfig> sublayersconfigC = {
         //{1,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"},
-        {2,6356.0, 6368.0, 2.6000	, 0.4956, 1, "SilicateC"}
+        {1,6356.0, 6368.0, 2.6000	, 0.4956, 1, "SilicateC"}
     };
     Crust.SetSubLayers(sublayersconfigC);
     Crust.BuildLayer();
@@ -199,14 +199,13 @@ void LayerTutorial() {
     Atmosphere.BuildLayer();
 
 
-    //top->AddNode(InnerCore.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
-    top->AddNode(InnerCore, 1,new TGeoTranslation(0, 0, 0));
-    top->AddNode(OuterCore.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
-    top->AddNode(LowerMantle.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
-    top->AddNode(UpperMantle.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
-    top->AddNode(Crust.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
-    top->AddNode(Ocean.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
-    top->AddNode(Atmosphere.GetLayerVolume(), 1,new TGeoTranslation(0, 0, 0));
+    top->AddNode(InnerCore,                     1,                            new TGeoTranslation(0, 0, 0));
+    top->AddNode(OuterCore.GetLayerVolume(),    OuterCore.GetLayerIndex(),    new TGeoTranslation(0, 0, 0));
+    top->AddNode(LowerMantle.GetLayerVolume(),  LowerMantle.GetLayerIndex(),  new TGeoTranslation(0, 0, 0));
+    top->AddNode(UpperMantle.GetLayerVolume(),  UpperMantle.GetLayerIndex(),  new TGeoTranslation(0, 0, 0));
+    top->AddNode(Crust.GetLayerVolume(),        Crust.GetLayerIndex(),        new TGeoTranslation(0, 0, 0));
+    top->AddNode(Ocean.GetLayerVolume(),        Ocean.GetLayerIndex(),        new TGeoTranslation(0, 0, 0));
+    top->AddNode(Atmosphere.GetLayerVolume(),   Atmosphere.GetLayerIndex(),   new TGeoTranslation(0, 0, 0));
 
     
     //SubLayerBlockMap
@@ -236,3 +235,54 @@ void LayerTutorial() {
     //view->ShowAxis();
 
 }
+
+/*
+    //TestEarth
+    TGeoMaterial *matIC = new TGeoMaterial("SolidNiFe",  0.4691, 1, 12.9807);
+    TGeoMedium *medIC = new TGeoMedium("SolidNiFe", 1, matIC);
+    TGeoVolume* InnerCore = new TGeoVolume("InnerCore_1", new TGeoSphere("Sphere", 0, 1221.5), medIC);
+
+    //
+    ModularEarth::Layer OuterCore("OuterCore",2,dphi,dtheta);
+    std::vector<ModularEarth::SublayerConfig> sublayersconfigOC = {
+        {1,1221.5, 3480.0, 10.0861, 0.4691, 1, "FeNi"}
+    };
+    OuterCore.SetSubLayers(sublayersconfigOC);
+    OuterCore.BuildLayer();
+
+    ModularEarth::Layer LowerMantle("LowerMantle",3,dphi,dtheta);
+    std::vector<ModularEarth::SublayerConfig> sublayersconfigLM = {
+        {1,3480.0, 5701.0, 4.4872, 0.4691, 1, "SilicateLM"}
+    };
+    LowerMantle.SetSubLayers(sublayersconfigLM);
+    LowerMantle.BuildLayer();
+
+    ModularEarth::Layer UpperMantle("UpperMantle",4,dphi,dtheta);
+    std::vector<ModularEarth::SublayerConfig> sublayersconfigUM = {
+        {1,5701.0, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"}
+    };
+    UpperMantle.SetSubLayers(sublayersconfigUM);
+    UpperMantle.BuildLayer();
+
+    ModularEarth::Layer Crust("Crust",5,dphi,dtheta);
+    std::vector<ModularEarth::SublayerConfig> sublayersconfigC = {
+        {1,6356.0, 6368.0, 2.6000	, 0.4956, 1, "SilicateC"}
+    };
+    Crust.SetSubLayers(sublayersconfigC);
+    Crust.BuildLayer();
+
+    ModularEarth::Layer Ocean("Ocean",6,dphi,dtheta);
+    std::vector<ModularEarth::SublayerConfig> sublayersconfigO = {
+        {1,6368.0, 6371.0, 1.0200	, 0.5525, 1, "SilicateO"}
+    };
+    Ocean.SetSubLayers(sublayersconfigO);
+    Ocean.BuildLayer();
+
+    ModularEarth::Layer Atmosphere("Atmosphere",7,dphi,dtheta);
+
+      std::vector<ModularEarth::SublayerConfig> sublayersconfigAtm = {
+        {1,6371.0, 6386.0	, 0.001	, 0.4991, 1, "Vac"}
+    };
+    Atmosphere.SetSubLayers(sublayersconfigAtm);
+    Atmosphere.BuildLayer();
+*/

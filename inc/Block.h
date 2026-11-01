@@ -65,8 +65,14 @@ namespace  ModularEarth {
             double density = 0; // Density (ρ) of volume medium
             std::string materialName = "Vacuum"; // Name of block material, by defualt it is set as vacuum.
 
-            // Indexing and flags for block info access and modificiations .
-            int blockID = 1; //Each block has a unique index id
+            // Hierarchical indices (1-based, set by SetBlockGeometry).
+            // Copy numbers passed to TGeoManager::AddNode equal these values,
+            // so ROOT navigation recovers them directly via GetCopyNumber().
+            int i_blk = 1; // Block index within its sublayer
+            int i_sly = 0; // Sublayer index within its layer
+            int i_ly  = 0; // Layer index within the Earth model
+
+            // Modification flags
             bool BlockModified = false; // Flag that indicates if material of a specific set of blocks was modified
             bool SubLayerModified = false; //Flag that indicates if material of all the blocks in a sublayer was modified
             int colorIndex = 1; // Index used to highlight modified blocks with different colors
@@ -103,18 +109,23 @@ namespace  ModularEarth {
             // Geometry and Material Definition
             // ------------------------------------------------------------------
 
-            /// Define the geometric boundaries of the block and assign its ID.
+            /// Define the geometric boundaries of the block and assign its hierarchical indices.
             ///
             /// Parameters:
-            ///   r1, r2       : Inner and outer radii of the spherical shell segment
-            ///   theta1,theta2: Colatitude range [degrees]
-            ///   phi1,phi2    : Longitude range [degrees]
-            ///   id           : Unique block identifier
-            
-            void SetBlockGeometry(double r1, double r2,
+            ///   r, R           : Inner and outer radii of the spherical shell segment
+            ///   theta1,theta2  : Colatitude range [degrees]
+            ///   phi1,phi2      : Longitude range [degrees]
+            ///   i_blk_         : 1-based block index within its sublayer
+            ///   i_ly_          : 1-based layer index (passed down from Layer via Sublayer)
+            ///   i_sly_         : 1-based sublayer index within that layer
+            ///
+            /// Must be called before DefineBlockMaterial() so the systematic ROOT
+            /// object names (BlockMat/BlockMed/BlockVol/BlockShape) are correct.
+
+            void SetBlockGeometry(double r, double R,
                                 double theta1, double theta2,
                                 double phi1, double phi2,
-                                int id);
+                                int i_blk_, int i_ly_, int i_sly_);
 
             /// Define the material properties of the block.
             ///
@@ -160,7 +171,16 @@ namespace  ModularEarth {
             /// such as Sublayers or Layers.
             TGeoVolume* GetVolume() const;
 
-            /// Return the unique block identifier.
+            /// Return the 1-based block index within its sublayer.
+            int GetBlockIndex() const;
+
+            /// Return the 1-based sublayer index (set by parent Sublayer).
+            int GetSublayerIndex() const;
+
+            /// Return the 1-based layer index (set by parent Layer via Sublayer).
+            int GetLayerIndex() const;
+
+            /// Deprecated alias for GetBlockIndex() — kept for Sublayer.C compatibility.
             int GetBlockID() const;
 
             bool IsBlockModified() const;

@@ -93,42 +93,46 @@ namespace ModularEarth {
         }
     }
 
-    void Earth::SetSublayerUpdates(int i_ly, // Index of the target Major Layer
-                int i_sly, // Index of the target Sublayer whithin the Major Layer
-                    double rho_sly, // New density of the target Sublayer
-                            double eyield_sly,
-                        const std::string& UpdateMaterialName) // new electron yield , Ye = \sum w_i x (Z/A)_i, of the target Sublayer
+    void Earth::SetSublayerUpdates(int i_ly, // 1-based index of the target major layer
+                int i_sly, // 1-based index of the target sublayer within that layer
+                    double rho_sly, // New density of the target sublayer  [g/cm³]
+                            double eyield_sly, // New electron yield  Ye = Σ wᵢ·(Z/A)ᵢ
+                        const std::string& UpdateMaterialName)
     {
-
         if (!earthlayers.empty()) {
             std::cerr << "Warning: Earth already built. Call SetSublayerUpdates before BuiltEarth().\n";
             return;
         }
-        
-        if (i_ly < 0 || i_ly >= static_cast<int>(layersconfigs.size())) {
-            std::cerr << "Error: Major layer index " << i_ly << " is out of bounds." << std::endl;
+
+        if (i_ly < 1 || i_ly > static_cast<int>(layersconfigs.size())) {
+            std::cerr << "Error: Layer index " << i_ly
+                      << " is out of bounds (valid range: 1–" << layersconfigs.size() << ").\n";
             return;
         }
 
-        const auto& targetLayer = layersconfigs[i_ly];
-
-        if (i_sly < 0 || i_sly >= static_cast<int>(layersconfigs[i_ly].sublayersconfig.size())) {
-            std::cerr << "Error: Sublayer index " << i_sly << " is out of bounds for major layer " << i_ly << "." << std::endl;
+        if (i_sly < 1 || i_sly > static_cast<int>(layersconfigs[i_ly - 1].sublayersconfig.size())) {
+            std::cerr << "Error: Sublayer index " << i_sly
+                      << " is out of bounds for layer " << i_ly
+                      << " (valid range: 1–" << layersconfigs[i_ly - 1].sublayersconfig.size() << ").\n";
             return;
         }
 
-        layersconfigs[i_ly].sublayersconfig[i_sly].density = rho_sly;
-        layersconfigs[i_ly].sublayersconfig[i_sly].atomicMass = 1.0; // Assuming electronYield is
-        layersconfigs[i_ly].sublayersconfig[i_sly].atomicNumber = eyield_sly; // Assuming electronYield is
-        layersconfigs[i_ly].sublayersconfig[i_sly].materialName = UpdateMaterialName; // Optional: Update material name to reflect changes
-
-    } 
+        layersconfigs[i_ly - 1].sublayersconfig[i_sly - 1].density      = rho_sly;
+        layersconfigs[i_ly - 1].sublayersconfig[i_sly - 1].atomicMass   = 1.0;
+        layersconfigs[i_ly - 1].sublayersconfig[i_sly - 1].atomicNumber = eyield_sly;
+        layersconfigs[i_ly - 1].sublayersconfig[i_sly - 1].materialName = UpdateMaterialName;
+    }
 
     
 
 
 
     void Earth::BuiltEarth() {
+
+        if (!earthlayers.empty()) {
+            std::cerr << "Warning: BuiltEarth() already called. Create a new Earth instance to rebuild.\n";
+            return;
+        }
 
         if (layersconfigs.empty()) {
             std::cout << "No layer configuration set for the current Earth model.\n"
@@ -144,17 +148,19 @@ namespace ModularEarth {
             const auto& layer_config = layersconfigs[ly];
 
             if (layer_config.sublayersconfig.empty()) {
-                std::cout << "  Incomplete configuration: no sublayers in layer " << ly
+                std::cout << "  Incomplete configuration: no sublayers in layer " << (ly + 1)
                         << ". Skipping.\n";
                 continue;
             }
 
+            int i_ly = static_cast<int>(ly) + 1; // 1-based layer index
+
             // Construct the Layer directly inside earthlayers (avoids copying raw pointers).
-            earthlayers.emplace_back("Layer", static_cast<int>(ly), dphi, dth);
+            earthlayers.emplace_back("Layer", i_ly, dth, dphi);
             Layer& MajorLayer = earthlayers.back();
             MajorLayer.SetSubLayers(layer_config.sublayersconfig);
             MajorLayer.BuildLayer();
-            top->AddNode(MajorLayer.GetLayerVolume(), static_cast<int>(ly) + 1,
+            top->AddNode(MajorLayer.GetLayerVolume(), i_ly,
                          new TGeoTranslation(0, 0, 0));
         }
 
@@ -177,7 +183,7 @@ namespace ModularEarth {
         for (size_t ly = 0; ly < layersconfigs.size(); ++ly) {
             const auto& layer_config = layersconfigs[ly];
 
-            std::cout << "\n--- Layer index: " << ly << "Index check: " << layer_config.layerindex << " ---\n";
+            std::cout << "\n--- Layer " << layer_config.layerindex << " (i_ly = " << layer_config.layerindex << ") ---\n";
 
             if (layer_config.sublayersconfig.empty()) {
                 std::cout << "  Incomplete configuration: no sublayers in this layer. "
@@ -186,7 +192,7 @@ namespace ModularEarth {
             }
 
             for (const auto& slayer_config : layer_config.sublayersconfig) {
-                std::cout << "  Sublayer " << slayer_config.layerID
+                std::cout << "  Sublayer " << slayer_config.sublayerID
                         << " | rmin: " << slayer_config.rmin
                         << " | rmax: " << slayer_config.rmax
                         << " | \u03c1: "   << slayer_config.density
@@ -209,6 +215,7 @@ namespace ModularEarth {
         geoManager->CloseGeometry();
 
     }
+
 
     // Change angular resolution (before building Earth)
     void Earth::SetBlockSizes(double dth, double dphi) {

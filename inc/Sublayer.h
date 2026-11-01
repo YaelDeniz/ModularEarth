@@ -109,10 +109,15 @@ namespace ModularEarth {
             // SubLayer Identification
             // ------------------------------------------------------------------
 
-            /// Numeric Index (ID) identifier for the SubLayer (used for debugging, material summary, naming and visualization).
-            int SubLayerID = 1;
+            /// 1-based sublayer index within its parent layer (0 = not yet assigned).
+            /// Copy number passed to TGeoManager::AddNode equals this value,
+            /// so ROOT navigation recovers it directly via GetCopyNumber().
+            int i_sly = 0;
 
-            /// ROOT volume name derived from SubLayerID (e.g. "SubLayer_ID").
+            /// 1-based layer index set by parent Layer via SetSubLayerIndex (0 = not yet assigned).
+            int i_ly  = 0;
+
+            /// ROOT volume name derived from i_ly and i_sly (e.g. "SubLayer_2_3").
             std::string SubLayerName = "ClassDefaultSubLayerName";
 
             // ------------------------------------------------------------------
@@ -180,6 +185,13 @@ namespace ModularEarth {
             //  The ID is used to generate a unique ROOT volume name and can also be
             //  used for visualization, material summary or bookkeeping purposes.
             
+            /// Set the 1-based sublayer index and its parent layer index.
+            /// Generates the globally unique ROOT volume name "SubLayer_<i_ly>_<i_sly>".
+            /// Must be called before CreateSubLayerBlocks() so block names are correct.
+            void SetSubLayerIndex(int i_sly_, int i_ly_);
+
+            /// Deprecated — sets i_sly only; i_ly stays 0 (unassigned).
+            /// Kept for Layer.C compatibility until that class is updated.
             void SetSubLayerID(int id);
 
             // ------------------------------------------------------------------
@@ -263,6 +275,9 @@ namespace ModularEarth {
 
             /// Return the ROOT volume assembly representing this SubLayer.
             TGeoVolumeAssembly* GetSubLayerVolume() const;
+
+            /// Return the 1-based sublayer index within its parent layer.
+            int GetSubLayerIndex() const { return i_sly; }
 
             // ------------------------------------------------------------------
             // Diagnostics and debugging

@@ -72,12 +72,12 @@ namespace ModularEarth {
         double density; // g/cm³
         double atomicMass; // A
         double atomicNumber; // Z
-        int layerID;
+        int sublayerID; // 1-based sublayer index within its parent layer
         std::string materialName; // Optional, default = "LayerMaterial"
 
         SublayerConfig() = default;
 
-        SublayerConfig(int id, double r1, double r2, double rho, double A, double Z, std::string name = "SubLayerMaterial"): layerID(id), rmin(r1), rmax(r2), density(rho), atomicMass(A), atomicNumber(Z), materialName(name) {}
+        SublayerConfig(int id, double r1, double r2, double rho, double A, double Z, std::string name = "SubLayerMaterial"): sublayerID(id), rmin(r1), rmax(r2), density(rho), atomicMass(A), atomicNumber(Z), materialName(name) {}
     };
 
     struct SubLayersUpdates
@@ -220,11 +220,11 @@ namespace ModularEarth {
             // SubLayer Identification
             // ------------------------------------------------------------------
 
-            /// Numeric Index (ID) identifier for the SubLayer (used for debugging, material summary, naming and visualization).
-            int layerID = 999;
+            /// 1-based layer index within the Earth model (0 = not yet assigned).
+            /// Copy number passed to TGeoManager::AddNode equals this value,
+            /// so ROOT navigation recovers it directly via GetCopyNumber().
+            int i_ly = 0;
 
-            /// ROOT volume name derived from layerID (e.g. "layer_ID").
-            ///std::string layerTitle = "DefaultEarthLayer";
             std::string layerName_string;
             std::string layerName;
 
@@ -262,12 +262,12 @@ namespace ModularEarth {
             //    - BuildLayer()
         
             Layer(std::string name = "DefaultLayer",
-            int l_id = 99,
+            int i_ly_ = 0,
             double dthsize = 10.0,
             double dphisize = 10.0)
-            : layerID(l_id),
+            : i_ly(i_ly_),
             layerName_string(std::move(name)),
-            layerName(layerName_string + "_" + std::to_string(layerID)),
+            layerName(layerName_string + "_" + std::to_string(i_ly_)),
             dphi(dphisize),
             dth(dthsize)
             {}
@@ -402,6 +402,9 @@ namespace ModularEarth {
             // Accessors
             // ------------------------------------------------------------------
             TGeoVolumeAssembly * GetLayerVolume() const ;
+
+            /// Return the 1-based layer index within the Earth model.
+            int GetLayerIndex() const { return i_ly; }
 
             // ------------------------------------------------------------------
             // Diagnostics and debugging

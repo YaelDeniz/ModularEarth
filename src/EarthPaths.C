@@ -109,6 +109,7 @@ namespace ModularEarth {
 
         // Total straight-line distance from atmospheric entry to detector
         const double total_dist = (r_det - r_src).Mag();
+        
 
         segments.clear();
 
@@ -184,8 +185,16 @@ namespace ModularEarth {
                                      mat->GetA() });
             }
 
-            // Stop once cumulative path length reaches the detector
-            if (sumL >= total_dist) break;
+            std::cout << "sumL = " << sumL
+                    << " total_dist = " << total_dist
+                    << " diff = " << std::abs(sumL - total_dist)
+                    << "\n";
+
+            double tol = 1e-2;
+
+            if (std::abs(sumL - total_dist) <= tol) break;
+
+            
 
             if (geoManager->IsOutside()) break;
 

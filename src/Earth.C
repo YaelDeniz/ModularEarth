@@ -165,6 +165,7 @@ namespace ModularEarth {
         }
 
         this->BuildGeometry();
+        this->PopulateBlockMaterialCache();
 
         // Attempt 2: via CLING interpreter (bypasses cppyy dispatch)
         // ret = ROOT.gROOT.ProcessLine("gGeoManager->CloseGeometry();")
@@ -223,6 +224,68 @@ namespace ModularEarth {
         this->dphi = dphi;
     }
 
-    
+    void Earth::PopulateBlockMaterialCache() {
+        BlockMaterialCache.resize(earthlayers.size());
+        for (size_t i = 0; i < earthlayers.size(); ++i) {
+            const auto& slys = earthlayers[i].GetSublayers();
+            BlockMaterialCache[i].resize(slys.size());
+            for (size_t j = 0; j < slys.size(); ++j) {
+                const auto& blks = slys[j].GetBlocks();
+                BlockMaterialCache[i][j].resize(blks.size());
+                for (size_t k = 0; k < blks.size(); ++k) {
+                    double rho = blks[k].GetDensity();
+                    double ye  = blks[k].GetEYield();
+                    BlockMaterialCache[i][j][k] = {
+                        rho, ye, blks[k].GetMaterialName(),
+                        rho, ye,
+                        false, false
+                    };
+                }
+            }
+        }
+    }
+
+    // Single-block setters
+    void Earth::SetBlockDensity(int i_ly, int i_sly, int i_blk, double density_) {
+        auto& b = BlockMaterialCache[i_ly-1][i_sly-1][i_blk-1];
+        b.density    = density_;
+        b.isModified = true;
+    }
+
+    void Earth::SetBlockEYield(int i_ly, int i_sly, int i_blk, double eYield_) {
+        auto& b = BlockMaterialCache[i_ly-1][i_sly-1][i_blk-1];
+        b.eYield     = eYield_;
+        b.isModified = true;
+    }
+
+    // Batch single-block setters
+    void Earth::SetBlockDensity(const std::vector<BlockMatUpdate>& updates) {
+        for (const auto& u : updates) SetBlockDensity(u.i_ly, u.i_sly, u.i_blk, u.value);
+    }
+
+    void Earth::SetBlockEYield(const std::vector<BlockMatUpdate>& updates) {
+        for (const auto& u : updates) SetBlockEYield(u.i_ly, u.i_sly, u.i_blk, u.value);
+    }
+
+    // Sublayer-level setters — update all blocks in the sublayer, mark both flags
+    void Earth::SetSublayerDensity(int i_ly, int i_sly, double density_) {
+        for (auto& b : BlockMaterialCache[i_ly-1][i_sly-1]) {
+            b.density           = density_;
+            b.isModified        = true;
+            b.isSubLayerModified = true;
+        }
+    }
+
+    void Earth::SetSublayerEYield(int i_ly, int i_sly, double eYield_) {
+        for (auto& b : BlockMaterialCache[i_ly-1][i_sly-1]) {
+            b.eYield            = eYield_;
+            b.isModified        = true;
+            b.isSubLayerModified = true;
+        }
+    }
+
+    const BlockMatInfo& Earth::GetBlockMatInfo(int i_ly, int i_sly, int i_blk) const {
+        return BlockMaterialCache[i_ly-1][i_sly-1][i_blk-1];
+    }
 
 };

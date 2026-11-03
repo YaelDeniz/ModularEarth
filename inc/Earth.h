@@ -28,6 +28,23 @@
 
 namespace ModularEarth {
 
+    struct BlockMatInfo {
+        double      density;
+        double      eYield;
+        std::string materialName;
+        double      originalDensity;
+        double      originalEYield;
+        bool        isModified         = false;
+        bool        isSubLayerModified = false;
+    };
+
+    struct BlockMatUpdate {
+        int    i_ly;
+        int    i_sly;
+        int    i_blk;
+        double value;
+    };
+
     class Earth {
     /////////////////////////////////////////////////////////////////////////////////////////////
     ///
@@ -78,6 +95,10 @@ namespace ModularEarth {
         
         TPolyMarker3D *NuDetMarkers = nullptr;
         TPolyLine3D* nuLine = nullptr;
+
+        std::vector<std::vector<std::vector<BlockMatInfo>>> BlockMaterialCache;
+
+        void PopulateBlockMaterialCache();
 
         //void function for Intersection calculation
         void BuildGeometry();
@@ -134,6 +155,20 @@ namespace ModularEarth {
         // Build the full ROOT geometry tree from the loaded PREM configuration
         void BuiltEarth();
         void GetModelSummary() const;
+
+        // Single-block setters (marks isModified only)
+        void SetBlockDensity(int i_ly, int i_sly, int i_blk, double density_);
+        void SetBlockEYield (int i_ly, int i_sly, int i_blk, double eYield_);
+
+        // Batch single-block setters
+        void SetBlockDensity(const std::vector<BlockMatUpdate>& updates);
+        void SetBlockEYield (const std::vector<BlockMatUpdate>& updates);
+
+        // Sublayer-level setters (marks both isModified and isSubLayerModified)
+        void SetSublayerDensity(int i_ly, int i_sly, double density_);
+        void SetSublayerEYield (int i_ly, int i_sly, double eYield_);
+
+        const BlockMatInfo& GetBlockMatInfo(int i_ly, int i_sly, int i_blk) const;
 
         TGeoManager* GetGeoManager() const { return geoManager; }
         TGeoVolume*  GetTopVolume()  const { return top; }

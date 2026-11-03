@@ -186,6 +186,10 @@ namespace  ModularEarth {
             bool IsBlockModified() const;
             bool IsSubLayerModified() const ;
 
+            double      GetDensity()      const { return density; }
+            double      GetAtomicNumber() const { return atomicNumber; }
+            std::string GetMaterialName() const { return materialName; }
+            double      GetEYield()       const { return blockMaterial->GetZ() / blockMaterial->GetA(); }
 
             // ------------------------------------------------------------------
             // Diagnostics and Debugging

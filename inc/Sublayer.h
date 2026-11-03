@@ -279,6 +279,8 @@ namespace ModularEarth {
             /// Return the 1-based sublayer index within its parent layer.
             int GetSubLayerIndex() const { return i_sly; }
 
+            const std::vector<Block>& GetBlocks() const { return blocks; }
+
             // ------------------------------------------------------------------
             // Diagnostics and debugging
             // ------------------------------------------------------------------

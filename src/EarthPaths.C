@@ -84,7 +84,7 @@ namespace ModularEarth {
 
     // -------------------------------------------------------------------------
 
-    void EarthPaths::GetSegments(double th, double phi, bool radians) {
+        void EarthPaths::GetSegments(double th, double phi, bool radians) {
         if (!geoManager) {
             std::cerr << "[EarthPaths] GetSegments: no geometry loaded.\n";
             return;

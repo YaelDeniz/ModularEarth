@@ -36,6 +36,7 @@ namespace ModularEarth {
         std::string volName;  // ROOT volume name
         std::string matName;  // Material name
         double density;       // Material density [g/cm³]
+        double eyield;
         double Z;             // Atomic number of material
         double A;             // Atomic mass of material [g/mol]
     };

@@ -5,6 +5,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "Layer.h"
+#include "EarthPaths.h"
 //#include "Sublayer.h"
 
 #include<iostream>
@@ -43,6 +44,20 @@ namespace ModularEarth {
         int    i_sly;
         int    i_blk;
         double value;
+    };
+
+    // One neutrino path through the Earth for a fixed direction.
+    // eyield[i]   = electron yield Ye = Z/A per segment
+    // density[i]  = mass density ρ [g/cm³]   per segment
+    // ne[i]       = electron number density ρ × Ye per segment
+    // baseline[i] = chord length [km]          per segment
+    struct OscProbPath {
+        double              costh;    // cos(zenith angle)  — direction identifier
+        double              azimuth;  // azimuth angle [same units as passed to BuildOscProbPath]
+        std::vector<double> eyield;   // Ye per segment
+        std::vector<double> density;  // ρ [g/cm³] per segment
+        std::vector<double> ne;       // ρ × Ye per segment
+        std::vector<double> baseline; // segment length [km]
     };
 
     class Earth {
@@ -97,6 +112,8 @@ namespace ModularEarth {
         TPolyLine3D* nuLine = nullptr;
 
         std::vector<std::vector<std::vector<BlockMatInfo>>> BlockMaterialCache;
+
+        EarthPaths* earthPaths = nullptr;
 
         void PopulateBlockMaterialCache();
 
@@ -169,6 +186,27 @@ namespace ModularEarth {
         void SetSublayerEYield (int i_ly, int i_sly, double eYield_);
 
         const BlockMatInfo& GetBlockMatInfo(int i_ly, int i_sly, int i_blk) const;
+
+        // Set the detector position used by GetEarthPath.
+        // Must be called after BuiltEarth().
+        void SetDetectorLocation(double lon, double lat, double R_det);
+
+        // Returns the neutrino propagation path for direction (th, phi).
+        // Geometry comes from EarthPaths; density and eYield are taken from
+        // BlockMaterialCache so user modifications via SetBlock*/SetSublayer*
+        // are reflected in the output.
+        // Must be called after BuiltEarth() and SetDetectorLocation().
+        std::vector<PathSegment> GetEarthPath(double th, double phi, bool radians = false);
+
+        // Build a single OscProbPath for direction (th, phi).
+        // Must be called after BuiltEarth() and SetDetectorLocation().
+        OscProbPath BuildOscProbPath(double th, double phi = 0.0, bool radians = false);
+
+        // Sweep a 1-D theta grid at fixed phi and return one OscProbPath per angle.
+        // Ordering in the output vector matches the ordering of th_grid.
+        std::vector<OscProbPath> BuildOscProbPaths(const std::vector<double>& th_grid,
+                                                    double phi     = 0.0,
+                                                    bool   radians = false);
 
         TGeoManager* GetGeoManager() const { return geoManager; }
         TGeoVolume*  GetTopVolume()  const { return top; }

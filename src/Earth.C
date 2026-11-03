@@ -1,4 +1,5 @@
 #include "Earth.h"
+#include "EarthPaths.h"
 #include "Layer.h"
 #include "Sublayer.h"
 
@@ -166,6 +167,7 @@ namespace ModularEarth {
 
         this->BuildGeometry();
         this->PopulateBlockMaterialCache();
+        earthPaths = new EarthPaths(geoManager);
 
         // Attempt 2: via CLING interpreter (bypasses cppyy dispatch)
         // ret = ROOT.gROOT.ProcessLine("gGeoManager->CloseGeometry();")
@@ -286,6 +288,78 @@ namespace ModularEarth {
 
     const BlockMatInfo& Earth::GetBlockMatInfo(int i_ly, int i_sly, int i_blk) const {
         return BlockMaterialCache[i_ly-1][i_sly-1][i_blk-1];
+    }
+
+    void Earth::SetDetectorLocation(double lon, double lat, double R_det) {
+        if (!earthPaths) {
+            std::cerr << "[Earth::SetDetectorLocation] Call BuiltEarth() before setting detector location.\n";
+            return;
+        }
+        earthPaths->SetDetectorLocation(lon, lat, R_det);
+    }
+
+    std::vector<PathSegment> Earth::GetEarthPath(double th_, double phi_, bool radians) {
+        if (BlockMaterialCache.empty()) {
+            std::cerr << "[Earth::GetEarthPath] BlockMaterialCache is empty — call BuiltEarth() first.\n";
+            return {};
+        }
+        if (!earthPaths) {
+            std::cerr << "[Earth::GetEarthPath] EarthPaths not initialized — call BuiltEarth() first.\n";
+            return {};
+        }
+
+        earthPaths->GetSegments(th_, phi_, radians);
+        const std::vector<PathSegment>& geom_segs = earthPaths->GetPathSegments();
+
+        std::vector<PathSegment> result;
+        result.reserve(geom_segs.size());
+
+        for (const PathSegment& geo_seg : geom_segs) {
+            const BlockMatInfo& mat =
+                BlockMaterialCache[geo_seg.i_ly  - 1]
+                                  [geo_seg.i_sly - 1]
+                                  [geo_seg.i_blk - 1];
+
+            PathSegment seg = geo_seg;   // copy all geometry fields
+            seg.density     = mat.density;
+            seg.eyield      = mat.eYield;
+
+            result.push_back(std::move(seg));
+        }
+
+        return result;
+    }
+
+    OscProbPath Earth::BuildOscProbPath(double th, double phi, bool radians) {
+        const std::vector<PathSegment> segs = GetEarthPath(th, phi, radians);
+
+        OscProbPath out;
+        out.costh   = std::cos(radians ? th : th * TMath::Pi() / 180.0);
+        out.azimuth = phi;
+        out.eyield.reserve(segs.size());
+        out.density.reserve(segs.size());
+        out.ne.reserve(segs.size());
+        out.baseline.reserve(segs.size());
+
+        for (const PathSegment& s : segs) {
+            out.eyield.push_back(s.eyield);
+            out.density.push_back(s.density);
+            out.ne.push_back(s.density * s.eyield);
+            out.baseline.push_back(s.distance);
+        }
+        return out;
+    }
+
+    std::vector<OscProbPath> Earth::BuildOscProbPaths(
+        const std::vector<double>& th_grid,
+        double phi,
+        bool   radians)
+    {
+        std::vector<OscProbPath> result;
+        result.reserve(th_grid.size());
+        for (double th : th_grid)
+            result.push_back(BuildOscProbPath(th, phi, radians));
+        return result;
     }
 
 };

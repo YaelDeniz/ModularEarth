@@ -51,9 +51,9 @@ namespace ModularEarth {
     // density[i]  = mass density ρ [g/cm³]   per segment
     // ne[i]       = electron number density ρ × Ye per segment
     // baseline[i] = chord length [km]          per segment
-    struct OscProbPath {
+    struct PropaPath { //PropagationPathSegemnt
         double              costh;    // cos(zenith angle)  — direction identifier
-        double              azimuth;  // azimuth angle [same units as passed to BuildOscProbPath]
+        double              azimuth;  // azimuth angle [same units as passed to BuildPropaPath]
         std::vector<double> eyield;   // Ye per segment
         std::vector<double> density;  // ρ [g/cm³] per segment
         std::vector<double> ne;       // ρ × Ye per segment
@@ -111,11 +111,29 @@ namespace ModularEarth {
         TPolyMarker3D *NuDetMarkers = nullptr;
         TPolyLine3D* nuLine = nullptr;
 
-        std::vector<std::vector<std::vector<BlockMatInfo>>> BlockMaterialCache;
+        mutable std::vector<std::vector<std::vector<BlockMatInfo>>> BlockMaterialCache;
+        std::vector<std::vector<std::vector<BlockMatInfo>>> BlockMaterialCacheOriginal;
 
         EarthPaths* earthPaths = nullptr;
 
+        // Geometry-only path cache populated by GetEarthPath(th_grid, phi).
+        // MultiGeomPathCache[i] holds the ROOT-tracked segments for th_grid[i].
+        // Density and eyield are NOT stored here; they are read from BlockMaterialCache
+        // at query time so material edits never invalidate the geometry cache.
+        std::vector<std::vector<PathSegment>> MultiGeomPathCache;
+
+        // Parallel angle cache: (costh, azimuth) for each slot in MultiGeomPathCache.
+        // Required so UpdateEarthPath/OriginalEarthPath can restore PropaPath.costh/azimuth.
+        std::vector<std::pair<double,double>> MultiGeomAngleCache;
+
         void PopulateBlockMaterialCache();
+
+        // Run ROOT tracking for (th, phi) and return geometry-only segments.
+        // Checks MultiGeomPathCache first; runs tracking only on a cache miss.
+        std::vector<PathSegment> SetEarthPath(double th, double phi, bool radians = false);
+
+        // Build a single PropaPath for direction (th, phi) using SetEarthPath.
+        PropaPath BuildPropaPath(double th, double phi = 0.0, bool radians = false);
 
         //void function for Intersection calculation
         void BuildGeometry();
@@ -187,26 +205,41 @@ namespace ModularEarth {
 
         const BlockMatInfo& GetBlockMatInfo(int i_ly, int i_sly, int i_blk) const;
 
+        const std::vector<std::vector<std::vector<BlockMatInfo>>>& GetBlockMaterialCache() const;
+        const std::vector<std::vector<std::vector<BlockMatInfo>>>& GetBlockMaterialCacheOriginal() const;
+
+        void StatusCacheOriginal() const;
+
+        void ResetBlockMaterialCache() const;
+
+        void ForcedMaterialCache(std::vector<std::vector<std::vector<BlockMatInfo>>> NewBlockMaterialCache);
+
         // Set the detector position used by GetEarthPath.
         // Must be called after BuiltEarth().
         void SetDetectorLocation(double lon, double lat, double R_det);
 
-        // Returns the neutrino propagation path for direction (th, phi).
-        // Geometry comes from EarthPaths; density and eYield are taken from
-        // BlockMaterialCache so user modifications via SetBlock*/SetSublayer*
-        // are reflected in the output.
+        // Sweep a th_grid × phi (fixed azimuth) and return one PropaPath per angle.
+        // Uses MultiGeomPathCache when available; falls back to live tracking otherwise.
         // Must be called after BuiltEarth() and SetDetectorLocation().
-        std::vector<PathSegment> GetEarthPath(double th, double phi, bool radians = false);
 
-        // Build a single OscProbPath for direction (th, phi).
-        // Must be called after BuiltEarth() and SetDetectorLocation().
-        OscProbPath BuildOscProbPath(double th, double phi = 0.0, bool radians = false);
+        //Multiple definiion of 
+        std::vector<PropaPath> GetEarthPath(double th_grid= 180,
+                                              double phi     = 0.0,
+                                              bool   radians = false);
 
-        // Sweep a 1-D theta grid at fixed phi and return one OscProbPath per angle.
-        // Ordering in the output vector matches the ordering of th_grid.
-        std::vector<OscProbPath> BuildOscProbPaths(const std::vector<double>& th_grid,
-                                                    double phi     = 0.0,
-                                                    bool   radians = false);
+        std::vector<PropaPath> GetEarthPath(const std::vector<double>& th_grid, //Grid centers
+                                              double phi     = 0.0,
+                                              bool   radians = false);
+
+        const std::vector<std::vector<PathSegment>>& GetMultiGeomPathCache() const { return MultiGeomPathCache; }
+
+        // Re-apply the current (possibly modified) BlockMaterialCache to the cached geometry.
+        // Requires a prior GetEarthPath call to populate MultiGeomPathCache.
+        std::vector<PropaPath> UpdateEarthPath();
+
+        // Re-apply BlockMaterialCacheOriginal (unmodified PREM) to the cached geometry.
+        // Requires a prior GetEarthPath call to populate MultiGeomPathCache.
+        std::vector<PropaPath> OriginalEarthPath();
 
         TGeoManager* GetGeoManager() const { return geoManager; }
         TGeoVolume*  GetTopVolume()  const { return top; }

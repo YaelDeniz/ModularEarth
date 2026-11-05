@@ -43,6 +43,7 @@ namespace ModularEarth {
         double z = R_det * std::sin(lat_rad);
 
         r_det.SetXYZ(x, y, z);
+        locationSet = true;
 
         // Local +z = radial outward
         z_hat = r_det.Unit();
@@ -87,6 +88,11 @@ namespace ModularEarth {
         void EarthPaths::GetSegments(double th, double phi, bool radians) {
         if (!geoManager) {
             std::cerr << "[EarthPaths] GetSegments: no geometry loaded.\n";
+            return;
+        }
+        if (!locationSet) {
+            std::cerr << "[EarthPaths] GetSegments: detector location not set — "
+                      << "call SetDetectorLocation() first.\n";
             return;
         }
 
@@ -184,11 +190,6 @@ namespace ModularEarth {
                                      mat->GetZ(),
                                      mat->GetA() });
             }
-
-            std::cout << "sumL = " << sumL
-                    << " total_dist = " << total_dist
-                    << " diff = " << std::abs(sumL - total_dist)
-                    << "\n";
 
             double tol = 1e-2;
 

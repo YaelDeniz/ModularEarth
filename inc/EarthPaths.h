@@ -81,6 +81,8 @@ namespace ModularEarth {
         TVector3 y_hat; // Local North
         TVector3 z_hat; // Radial outward (= r_det.Unit())
 
+        bool locationSet = false; // true after SetDetectorLocation() is called
+
         // Path segments accumulated by the last GetSegments() call
         std::vector<PathSegment> segments;
 

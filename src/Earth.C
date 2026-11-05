@@ -245,7 +245,13 @@ namespace ModularEarth {
                 }
             }
         }
+        BlockMaterialCacheOriginal = BlockMaterialCache;
     }
+
+    void Earth::ResetBlockMaterialCache() const {
+        BlockMaterialCache = BlockMaterialCacheOriginal;
+    }
+
 
     // Single-block setters
     void Earth::SetBlockDensity(int i_ly, int i_sly, int i_blk, double density_) {
@@ -262,11 +268,29 @@ namespace ModularEarth {
 
     // Batch single-block setters
     void Earth::SetBlockDensity(const std::vector<BlockMatUpdate>& updates) {
-        for (const auto& u : updates) SetBlockDensity(u.i_ly, u.i_sly, u.i_blk, u.value);
+        for (const auto& u : updates) {
+            if (u.i_ly  < 1 || u.i_ly  > (int)BlockMaterialCache.size()           ||
+                u.i_sly < 1 || u.i_sly > (int)BlockMaterialCache[u.i_ly-1].size() ||
+                u.i_blk < 1 || u.i_blk > (int)BlockMaterialCache[u.i_ly-1][u.i_sly-1].size()) {
+                std::cerr << "[SetBlockDensity] Out-of-range index ("
+                          << u.i_ly << "," << u.i_sly << "," << u.i_blk << ") — skipping.\n";
+                continue;
+            }
+            SetBlockDensity(u.i_ly, u.i_sly, u.i_blk, u.value);
+        }
     }
 
     void Earth::SetBlockEYield(const std::vector<BlockMatUpdate>& updates) {
-        for (const auto& u : updates) SetBlockEYield(u.i_ly, u.i_sly, u.i_blk, u.value);
+        for (const auto& u : updates) {
+            if (u.i_ly  < 1 || u.i_ly  > (int)BlockMaterialCache.size()           ||
+                u.i_sly < 1 || u.i_sly > (int)BlockMaterialCache[u.i_ly-1].size() ||
+                u.i_blk < 1 || u.i_blk > (int)BlockMaterialCache[u.i_ly-1][u.i_sly-1].size()) {
+                std::cerr << "[SetBlockEYield] Out-of-range index ("
+                          << u.i_ly << "," << u.i_sly << "," << u.i_blk << ") — skipping.\n";
+                continue;
+            }
+            SetBlockEYield(u.i_ly, u.i_sly, u.i_blk, u.value);
+        }
     }
 
     // Sublayer-level setters — update all blocks in the sublayer, mark both flags
@@ -290,6 +314,41 @@ namespace ModularEarth {
         return BlockMaterialCache[i_ly-1][i_sly-1][i_blk-1];
     }
 
+    const std::vector<std::vector<std::vector<BlockMatInfo>>>& Earth::GetBlockMaterialCache() const {
+        return BlockMaterialCache;
+    }
+
+    const std::vector<std::vector<std::vector<BlockMatInfo>>>& Earth::GetBlockMaterialCacheOriginal() const {
+        return BlockMaterialCacheOriginal;
+    }
+
+    void Earth::StatusCacheOriginal() const {
+        if (BlockMaterialCacheOriginal.empty()) {
+            std::cout << "[StatusCacheOriginal] Cache is empty — call BuiltEarth() first.\n";
+            return;
+        }
+        std::cout << "Total Major Layers in model = " << BlockMaterialCacheOriginal.size() << "\n";
+        for (size_t i = 0; i < BlockMaterialCacheOriginal.size(); ++i) {
+            int i_ly = static_cast<int>(i) + 1;
+            std::cout << "  Layer " << i_ly
+                      << ": Total number of Sublayers: " << BlockMaterialCacheOriginal[i].size() << "\n";
+            for (size_t j = 0; j < BlockMaterialCacheOriginal[i].size(); ++j) {
+                int i_sly = static_cast<int>(j) + 1;
+                std::cout << "    Sublayer_" << i_ly << "_" << i_sly
+                          << ": Total number of blocks: " << BlockMaterialCacheOriginal[i][j].size() << "\n";
+            }
+        }
+    }
+
+    void Earth::ForcedMaterialCache(std::vector<std::vector<std::vector<BlockMatInfo>>> NewBlockMaterialCache) {
+        if (NewBlockMaterialCache.size() != BlockMaterialCacheOriginal.size()) {
+            std::cerr << "[ForcedMaterialCache] Warning: layer count mismatch — "
+                      << "provided " << NewBlockMaterialCache.size()
+                      << " layers, model has " << BlockMaterialCacheOriginal.size() << ".\n";
+        }
+        BlockMaterialCache = std::move(NewBlockMaterialCache);
+    }
+
     void Earth::SetDetectorLocation(double lon, double lat, double R_det) {
         if (!earthPaths) {
             std::cerr << "[Earth::SetDetectorLocation] Call BuiltEarth() before setting detector location.\n";
@@ -298,13 +357,13 @@ namespace ModularEarth {
         earthPaths->SetDetectorLocation(lon, lat, R_det);
     }
 
-    std::vector<PathSegment> Earth::GetEarthPath(double th_, double phi_, bool radians) {
+    std::vector<PathSegment> Earth::SetEarthPath(double th_, double phi_, bool radians) {
         if (BlockMaterialCache.empty()) {
-            std::cerr << "[Earth::GetEarthPath] BlockMaterialCache is empty — call BuiltEarth() first.\n";
+            std::cerr << "[Earth::SetEarthPath] BlockMaterialCache is empty — call BuiltEarth() first.\n";
             return {};
         }
         if (!earthPaths) {
-            std::cerr << "[Earth::GetEarthPath] EarthPaths not initialized — call BuiltEarth() first.\n";
+            std::cerr << "[Earth::SetEarthPath] EarthPaths not initialized — call BuiltEarth() first.\n";
             return {};
         }
 
@@ -320,7 +379,7 @@ namespace ModularEarth {
                                   [geo_seg.i_sly - 1]
                                   [geo_seg.i_blk - 1];
 
-            PathSegment seg = geo_seg;   // copy all geometry fields
+            PathSegment seg = geo_seg;
             seg.density     = mat.density;
             seg.eyield      = mat.eYield;
 
@@ -330,10 +389,11 @@ namespace ModularEarth {
         return result;
     }
 
-    OscProbPath Earth::BuildOscProbPath(double th, double phi, bool radians) {
-        const std::vector<PathSegment> segs = GetEarthPath(th, phi, radians);
 
-        OscProbPath out;
+    PropaPath Earth::BuildPropaPath(double th, double phi, bool radians) {
+        const std::vector<PathSegment> segs = SetEarthPath(th, phi, radians);
+
+        PropaPath out;
         out.costh   = std::cos(radians ? th : th * TMath::Pi() / 180.0);
         out.azimuth = phi;
         out.eyield.reserve(segs.size());
@@ -349,17 +409,118 @@ namespace ModularEarth {
         }
         return out;
     }
-
-    std::vector<OscProbPath> Earth::BuildOscProbPaths(
+ 
+    // Populates MultiGeomPathCache with geometry-only segments; MultiGeomPathCache[i]
+    // corresponds to th_grid[i] at the given phi.
+    std::vector<PropaPath> Earth::GetEarthPath(
         const std::vector<double>& th_grid,
         double phi,
         bool   radians)
     {
-        std::vector<OscProbPath> result;
+        std::cout << "[Earth::GetEarthPath] Building Earth paths for " << th_grid.size() << " angles.\n";
+        MultiGeomPathCache.clear();
+        MultiGeomPathCache.resize(th_grid.size());
+        MultiGeomAngleCache.clear();
+        MultiGeomAngleCache.resize(th_grid.size());
+        std::cout << "[Earth::GetEarthPath] Free cache  paths for " << th_grid.size() << " angles.\n";
+        std::vector<PropaPath> result;
         result.reserve(th_grid.size());
-        for (double th : th_grid)
-            result.push_back(BuildOscProbPath(th, phi, radians));
+
+        for (size_t nth = 0; nth < th_grid.size(); ++nth) {
+            std::cout << "Building PropaPaths for " << nth << " angles.\n";
+            result.push_back(BuildPropaPath(th_grid[nth], phi, radians));
+            std::cout << "Finished building PropaPath for " << nth << " angles.\n";
+            MultiGeomPathCache[nth] = earthPaths->GetPathSegments();
+            double costh = std::cos(radians ? th_grid[nth] : th_grid[nth] * TMath::Pi() / 180.0);
+            MultiGeomAngleCache[nth] = {costh, phi};
+        }
+
+         std::cout << "[Earth::GetEarthPath] Finished building paths for " << result.size() << " angles.\n";
         return result;
     }
+
+    // Re-applies the current BlockMaterialCache to the cached geometry segments.
+    // Returns one PropaPath per angle, identical in structure to GetEarthPath output.
+    // Must be called after GetEarthPath has populated MultiGeomPathCache.
+    std::vector<PropaPath> Earth::UpdateEarthPath()
+    {
+        if (MultiGeomPathCache.empty()) {
+            std::cerr << "[UpdateEarthPath] GeomCache is empty — call GetEarthPath first.\n";
+            return {};
+        }
+        if (BlockMaterialCache.empty()) {
+            std::cerr << "[UpdateEarthPath] BlockMaterialCache is empty — call BuiltEarth() first.\n";
+            return {};
+        }
+
+        std::vector<PropaPath> result;
+        result.reserve(MultiGeomPathCache.size());
+
+        for (size_t nth = 0; nth < MultiGeomPathCache.size(); ++nth) {
+            PropaPath pp;
+            pp.costh   = MultiGeomAngleCache[nth].first;
+            pp.azimuth = MultiGeomAngleCache[nth].second;
+            const auto& segs = MultiGeomPathCache[nth];
+            pp.eyield.reserve(segs.size());
+            pp.density.reserve(segs.size());
+            pp.ne.reserve(segs.size());
+            pp.baseline.reserve(segs.size());
+
+            for (const PathSegment& seg : segs) {
+                const BlockMatInfo& mat =
+                    BlockMaterialCache[seg.i_ly  - 1]
+                                      [seg.i_sly - 1]
+                                      [seg.i_blk - 1];
+                pp.eyield.push_back(mat.eYield);
+                pp.density.push_back(mat.density);
+                pp.ne.push_back(mat.density * mat.eYield);
+                pp.baseline.push_back(seg.distance);
+            }
+            result.push_back(std::move(pp));
+        }
+        return result;
+    }
+
+    // Re-applies BlockMaterialCacheOriginal (unmodified PREM) to the cached geometry segments.
+    // Returns one PropaPath per angle. Must be called after GetEarthPath.
+    std::vector<PropaPath> Earth::OriginalEarthPath()
+    {
+        if (MultiGeomPathCache.empty()) {
+            std::cerr << "[OriginalEarthPath] GeomCache is empty — call GetEarthPath first.\n";
+            return {};
+        }
+        if (BlockMaterialCacheOriginal.empty()) {
+            std::cerr << "[OriginalEarthPath] BlockMaterialCacheOriginal is empty — call BuiltEarth() first.\n";
+            return {};
+        }
+
+        std::vector<PropaPath> result;
+        result.reserve(MultiGeomPathCache.size());
+
+        for (size_t nth = 0; nth < MultiGeomPathCache.size(); ++nth) {
+            PropaPath pp;
+            pp.costh   = MultiGeomAngleCache[nth].first;
+            pp.azimuth = MultiGeomAngleCache[nth].second;
+            const auto& segs = MultiGeomPathCache[nth];
+            pp.eyield.reserve(segs.size());
+            pp.density.reserve(segs.size());
+            pp.ne.reserve(segs.size());
+            pp.baseline.reserve(segs.size());
+
+            for (const PathSegment& seg : segs) {
+                const BlockMatInfo& mat =
+                    BlockMaterialCacheOriginal[seg.i_ly  - 1]
+                                              [seg.i_sly - 1]
+                                              [seg.i_blk - 1];
+                pp.eyield.push_back(mat.eYield);
+                pp.density.push_back(mat.density);
+                pp.ne.push_back(mat.density * mat.eYield);
+                pp.baseline.push_back(seg.distance);
+            }
+            result.push_back(std::move(pp));
+        }
+        return result;
+    }
+
 
 };

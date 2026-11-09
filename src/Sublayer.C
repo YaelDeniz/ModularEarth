@@ -35,7 +35,10 @@
 namespace ModularEarth {
     // NOTES overlapping shapes ? Are blocks  tiling cleanly
     void Sublayer::BuildAssembly() {
-        if (SubLayer) delete SubLayer;
+        // Do NOT delete the previous TGeoVolumeAssembly. ROOT's TGeoManager owns every assembly
+        // it registers. Manually deleting it leaves dangling pointers in ROOT's node list,
+        // which crashes navigation and rendering. ROOT cleans up all volumes when the manager
+        // is destroyed.
         SubLayer = new TGeoVolumeAssembly(SubLayerName.c_str());
 
         for (const auto & b: blocks) {
@@ -75,14 +78,24 @@ namespace ModularEarth {
     ///   dth: Longitude range [degrees]
     ///   dph: Latitud range [degrees]
     void Sublayer::CreateSubLayerBlocks(double r1, double r2, double dphi, double dth) {
+            // One shared TGeoMaterial + TGeoMedium for all blocks in this sublayer.
+            // ROOT owns both objects via its internal TLists; do not delete them.
+            static int s_nextMedId = 2; // 1 is reserved for the Vacuum medium on the top volume
+            sharedMat = new TGeoMaterial(Form("SlMat_%d_%d", i_ly, i_sly),
+                                         SubLayerA, SubLayerZ, SubLayerDensity);
+            sharedMed = new TGeoMedium(Form("SlMed_%d_%d", i_ly, i_sly),
+                                       s_nextMedId++, sharedMat);
+
             // Innermost sublayer (r1=0): single full sphere avoids degenerate overlapping
             // wedges at the center that confuse ROOT's geometry navigator.
             if (r1 < 1e-10) {
+                std::cout << "  [Sublayer " << i_sly << " of layer " << i_ly
+                          << "] Innermost sublayer (r1=0): creating single full-sphere block\n";
                 Block block;
                 block.SetBlockGeometry(0.0, r2, 0.0, 180.0, 0.0, 360.0, 1, i_ly, i_sly);
                 block.DefineBlockMaterial(SubLayerMaterialName, SubLayerA, SubLayerZ, SubLayerDensity);
-                block.BuildBlock(i_sly);
-                blocks.push_back(block);
+                block.BuildBlock(sharedMed);
+                blocks.push_back(std::move(block));
                 return;
             }
 
@@ -101,8 +114,8 @@ namespace ModularEarth {
                     Block block;
                     block.SetBlockGeometry(r1, r2, th1, th2, phi1, phi2, i_blk, i_ly, i_sly);
                     block.DefineBlockMaterial(SubLayerMaterialName, SubLayerA, SubLayerZ, SubLayerDensity);
-                    block.BuildBlock(i_sly);
-                    blocks.push_back(block);
+                    block.BuildBlock(sharedMed);
+                    blocks.push_back(std::move(block));
                     i_blk++;
                 }
             }
@@ -143,7 +156,7 @@ namespace ModularEarth {
         Block & modifiedBlock = blocks[id - 1];
         modifiedBlock.DefineBlockMaterial(NewName, NewA, NewZ, NewDensity);
         modifiedBlock.BlockWasModified(true);
-        modifiedBlock.BuildBlock();
+        modifiedBlock.BuildBlock(sharedMed);
         BlocksUpdate = true;
     }
 
@@ -160,7 +173,7 @@ namespace ModularEarth {
             Block & modifiedBlock = blocks[id - 1];
             modifiedBlock.DefineBlockMaterial(NewName, NewA, NewZ, NewDensity);
             modifiedBlock.BlockWasModified(true);
-            modifiedBlock.BuildBlock();
+            modifiedBlock.BuildBlock(sharedMed);
         }
         BlocksUpdate = true;
     }
@@ -170,7 +183,7 @@ namespace ModularEarth {
         for (Block & modifiedBlock: blocks) {
             modifiedBlock.DefineBlockMaterial(NewName, NewA, NewZ, NewDensity);
             modifiedBlock.SubLayerWasModified(true);
-            modifiedBlock.BuildBlock();
+            modifiedBlock.BuildBlock(sharedMed);
         }
         FullUpdate = true;
     }
@@ -203,14 +216,14 @@ namespace ModularEarth {
     /// Print a detailed summary of the block geometry, material,
     /// modification flags, and internal ROOT pointers.
 
-    void Sublayer::GetBlockSummary(int id) {
+    void Sublayer::GetBlockSummary(int id) const {
         if (id >= 1 && id <= static_cast < int > (blocks.size()))
             blocks[id - 1].BlockSummary();
         else
             std::cerr << "Invalid block ID: " << id << std::endl;
     }
 
-    void Sublayer::GetAllBlockSummary() {
+    void Sublayer::GetAllBlockSummary() const {
         for (const auto & b: blocks) {
             if (!b.IsValid()) {
                 std::cerr << "Error: Invalid block\n";

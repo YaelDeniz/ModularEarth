@@ -40,16 +40,25 @@ namespace ModularEarth {
 // stored in a LayerConfig object and the sublayer list is reset for the sets of sublayers
 // beloging to the new next major layer.
 
-    void Earth::SetEarthModel(TString premtable) {
+    void Earth::SetEarthModel(TString premtable_) {
 
         std::string PATH_table;
-        if (premtable.IsNull()){
+        if (premtable_.IsNull()){
             PATH_table = (PATH_premdir + premtable_default + ".txt").Data();
         }
 
         else
         {
-            PATH_table = (PATH_premdir + premtable + ".txt").Data();
+            PATH_table = (PATH_premdir + premtable_ + ".txt").Data();
+        }
+
+        if(!layersconfigs.empty()) {
+            std::cout << "Clearing existing layer configurations." << std::endl;
+            layersconfigs.clear();
+        }
+        if(!sublayersconfigs.empty()) {
+            std::cout << "Clearing existing sublayer configurations." << std::endl;
+            sublayersconfigs.clear();
         }
 
         std::ifstream infile(PATH_table);
@@ -77,7 +86,7 @@ namespace ModularEarth {
             // Store the previous layer's sublayer configurations and reset for the new layer. 
             if (ly != ly_prev && ly_prev != -1) {
                 // Commit the  layer's sublayer configurations 
-                layersconfigs.push_back({"Layer", ly_prev+1, dth, dphi, sublayersconfigs});
+                layersconfigs.push_back({Form("Layer_%d", ly_prev+1), ly_prev+1, dth, dphi, sublayersconfigs});
                 sublayersconfigs.clear(); // Reset sublayer configurations for a new major layer
                 sly = 1; // Reset sublayer index for a new major layer
             }
@@ -90,7 +99,7 @@ namespace ModularEarth {
         }
 
         if (!sublayersconfigs.empty()) {
-            layersconfigs.push_back({"Layer", ly_prev+1, dth, dphi, sublayersconfigs});
+            layersconfigs.push_back({Form("Layer_%d", ly_prev+1), ly_prev+1, dth, dphi, sublayersconfigs});
         }
     }
 
@@ -101,7 +110,7 @@ namespace ModularEarth {
                         const std::string& UpdateMaterialName)
     {
         if (!earthlayers.empty()) {
-            std::cerr << "Warning: Earth already built. Call SetSublayerUpdates before BuiltEarth().\n";
+            std::cerr << "Warning: Earth already built. Call SetSublayerUpdates before BuildEarth().\n";
             return;
         }
 
@@ -128,10 +137,10 @@ namespace ModularEarth {
 
 
 
-    void Earth::BuiltEarth() {
+    void Earth::BuildEarth() {
 
         if (!earthlayers.empty()) {
-            std::cerr << "Warning: BuiltEarth() already called. Create a new Earth instance to rebuild.\n";
+            std::cerr << "Warning: BuildEarth() already called. Create a new Earth instance to rebuild.\n";
             return;
         }
 
@@ -157,12 +166,13 @@ namespace ModularEarth {
             int i_ly = static_cast<int>(ly) + 1; // 1-based layer index
 
             // Construct the Layer directly inside earthlayers (avoids copying raw pointers).
-            earthlayers.emplace_back("Layer", i_ly, dth, dphi);
+            earthlayers.emplace_back(Form("Layer_%d", i_ly), i_ly, dth, dphi);
             Layer& MajorLayer = earthlayers.back();
             MajorLayer.SetSubLayers(layer_config.sublayersconfig);
             MajorLayer.BuildLayer();
             top->AddNode(MajorLayer.GetLayerVolume(), i_ly,
                          new TGeoTranslation(0, 0, 0));
+            std::cout << "Layer " << i_ly << " added to the Earth geometry." << std::endl;
         }
 
         this->BuildGeometry();
@@ -215,8 +225,15 @@ namespace ModularEarth {
             return;
         }
 
+        std::cout << "Before CloseGeometry: "
+                  << geoManager->GetListOfVolumes()->GetEntries() << " volumes, "
+                  << geoManager->GetListOfMedia()->GetEntries()   << " media registered\n";
+
         geoManager->CloseGeometry();
 
+        std::cout << "After  CloseGeometry: "
+                  << geoManager->GetListOfVolumes()->GetEntries() << " volume UIDs, "
+                  << "IsClosed=" << geoManager->IsClosed() << "\n";
     }
 
 
@@ -324,7 +341,7 @@ namespace ModularEarth {
 
     void Earth::StatusCacheOriginal() const {
         if (BlockMaterialCacheOriginal.empty()) {
-            std::cout << "[StatusCacheOriginal] Cache is empty — call BuiltEarth() first.\n";
+            std::cout << "[StatusCacheOriginal] Cache is empty — call BuildEarth() first.\n";
             return;
         }
         std::cout << "Total Major Layers in model = " << BlockMaterialCacheOriginal.size() << "\n";
@@ -334,8 +351,16 @@ namespace ModularEarth {
                       << ": Total number of Sublayers: " << BlockMaterialCacheOriginal[i].size() << "\n";
             for (size_t j = 0; j < BlockMaterialCacheOriginal[i].size(); ++j) {
                 int i_sly = static_cast<int>(j) + 1;
+                // All blocks in the original model share the sublayer's uniform density,
+                // eYield, and radial extent, so reading [0] is representative for all.
+                const auto& ref  = BlockMaterialCacheOriginal[i][j][0];
+                const auto& scfg = layersconfigs[i].sublayersconfig[j];
                 std::cout << "    Sublayer_" << i_ly << "_" << i_sly
-                          << ": Total number of blocks: " << BlockMaterialCacheOriginal[i][j].size() << "\n";
+                          << ": rmin: "    << scfg.rmin
+                          << ", rmax: "   << scfg.rmax
+                          << ", density: " << ref.density
+                          << ", eYield: "  << ref.eYield
+                          << "  |  Total number of blocks: " << BlockMaterialCacheOriginal[i][j].size() << "\n";
             }
         }
     }
@@ -351,7 +376,7 @@ namespace ModularEarth {
 
     void Earth::SetDetectorLocation(double lon, double lat, double R_det) {
         if (!earthPaths) {
-            std::cerr << "[Earth::SetDetectorLocation] Call BuiltEarth() before setting detector location.\n";
+            std::cerr << "[Earth::SetDetectorLocation] Call BuildEarth() before setting detector location.\n";
             return;
         }
         earthPaths->SetDetectorLocation(lon, lat, R_det);
@@ -359,11 +384,11 @@ namespace ModularEarth {
 
     std::vector<PathSegment> Earth::SetEarthPath(double th_, double phi_, bool radians) {
         if (BlockMaterialCache.empty()) {
-            std::cerr << "[Earth::SetEarthPath] BlockMaterialCache is empty — call BuiltEarth() first.\n";
+            std::cerr << "[Earth::SetEarthPath] BlockMaterialCache is empty — call BuildEarth() first.\n";
             return {};
         }
         if (!earthPaths) {
-            std::cerr << "[Earth::SetEarthPath] EarthPaths not initialized — call BuiltEarth() first.\n";
+            std::cerr << "[Earth::SetEarthPath] EarthPaths not initialized — call BuildEarth() first.\n";
             return {};
         }
 
@@ -449,7 +474,7 @@ namespace ModularEarth {
             return {};
         }
         if (BlockMaterialCache.empty()) {
-            std::cerr << "[UpdateEarthPath] BlockMaterialCache is empty — call BuiltEarth() first.\n";
+            std::cerr << "[UpdateEarthPath] BlockMaterialCache is empty — call BuildEarth() first.\n";
             return {};
         }
 
@@ -490,7 +515,7 @@ namespace ModularEarth {
             return {};
         }
         if (BlockMaterialCacheOriginal.empty()) {
-            std::cerr << "[OriginalEarthPath] BlockMaterialCacheOriginal is empty — call BuiltEarth() first.\n";
+            std::cerr << "[OriginalEarthPath] BlockMaterialCacheOriginal is empty — call BuildEarth() first.\n";
             return {};
         }
 

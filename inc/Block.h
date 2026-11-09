@@ -48,11 +48,9 @@ namespace  ModularEarth {
         ///
         //////////////////////////////////////////////////////////////////////////////////////////////////////////
         
-        private: 
+        private:
 
             TGeoVolume * block = nullptr; // Owns the shape
-            TGeoMaterial * blockMaterial = nullptr; // Owns the Material
-            TGeoMedium * blockMedium = nullptr; // Owns the Medium
 
             // Block Geometry Parameters
             double rmin = 0, rmax = 1; // Inner (rmin) and outer (rmax) radius of the block
@@ -88,6 +86,21 @@ namespace  ModularEarth {
             /// defined in the private section. Geometry and material must be set
             /// explicitly before building the Block.
             Block() = default;
+
+            // Move constructor and assignment are explicitly noexcept so that
+            // std::vector<Block> always moves (not copies) during reallocation.
+            // Without the explicit noexcept, the compiler-generated move inherits
+            // the noexcept status of std::string (not guaranteed on all platforms),
+            // causing std::vector to fall back to the copy constructor — which
+            // shallow-copies TGeoVolume* and crashes inside ROOT's object tracking.
+            Block(Block&&) noexcept = default;
+            Block& operator=(Block&&) noexcept = default;
+
+            // The copy constructor is kept (not deleted) because ROOT's dictionary
+            // generator (rootcling) requires copy-constructible types for vector I/O.
+            // Do not call it in application code: use std::move() instead.
+            Block(const Block&) = default;
+            Block& operator=(const Block&) = default;
 
 
             // ------------------------------------------------------------------
@@ -151,7 +164,7 @@ namespace  ModularEarth {
             /// This creates the TGeoShape, TGeoVolume, and assigns visualization
             /// properties based on modification flags.
             /// A valid TGeoManager must exist prior to calling this method.
-            void BuildBlock(int colorid = 1);
+            void BuildBlock(TGeoMedium* medium);
 
 
             // ------------------------------------------------------------------
@@ -189,7 +202,7 @@ namespace  ModularEarth {
             double      GetDensity()      const { return density; }
             double      GetAtomicNumber() const { return atomicNumber; }
             std::string GetMaterialName() const { return materialName; }
-            double      GetEYield()       const { return blockMaterial->GetZ() / blockMaterial->GetA(); }
+            double      GetEYield()       const { return atomicNumber / atomicMass; }
 
             // ------------------------------------------------------------------
             // Diagnostics and Debugging

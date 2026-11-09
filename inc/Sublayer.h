@@ -129,6 +129,11 @@ namespace ModularEarth {
             double SubLayerA       = 99.99;
             double SubLayerDensity = 99.99;   // g/cm^3
 
+            /// Shared ROOT material and medium for all blocks in this sublayer.
+            /// Owned by ROOT's TGeoManager; do not delete.
+            TGeoMaterial* sharedMat = nullptr;
+            TGeoMedium*   sharedMed = nullptr;
+
             // ------------------------------------------------------------------
             // Update state flags
             // ------------------------------------------------------------------
@@ -178,6 +183,22 @@ namespace ModularEarth {
             //    - BuildSubLayer()
             //
             Sublayer() = default;
+
+            // Explicit noexcept move constructor ensures std::vector<Sublayer> always
+            // moves (not copies) during reallocation. Without the explicit noexcept,
+            // the compiler-generated move constructor inherits the noexcept status of
+            // its std::string members, which is not guaranteed on all platforms. When
+            // the move is not noexcept, std::vector falls back to the copy constructor,
+            // which shallow-copies TGeoVolumeAssembly* and TGeoVolume* pointers — causing
+            // ROOT's internal object tracking to crash.
+            Sublayer(Sublayer&&) noexcept = default;
+            Sublayer& operator=(Sublayer&&) noexcept = default;
+
+            // The copy constructor is kept (not deleted) because ROOT's dictionary
+            // generator (rootcling) requires copy-constructible types for vector I/O.
+            // Do not call it in application code: use std::move() or const references instead.
+            Sublayer(const Sublayer&) = default;
+            Sublayer& operator=(const Sublayer&) = default;
 
             
             //  \brief Assign a numeric ID to this SubLayer.
@@ -286,10 +307,10 @@ namespace ModularEarth {
             // ------------------------------------------------------------------
 
             /// Print detailed information for a specific Block (1-based ID).
-            void GetBlockSummary(int id);
+            void GetBlockSummary(int id) const;
 
             /// Print summaries for all Blocks in the SubLayer.
-            void GetAllBlockSummary();
+            void GetAllBlockSummary() const;
 
             /// Print a concise summary of SubLayer properties and update state.
             void GetSubLayerSummary();

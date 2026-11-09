@@ -22,8 +22,8 @@
 void LayerTutorial() {
     //Comparion with OscProbe
 
-    int dtheta = 20;
-    int dphi = 20;
+    int dtheta = 10;
+    int dphi = 10;
 
     TMultiGraph * ThePaths = new TMultiGraph();
 
@@ -114,65 +114,6 @@ void LayerTutorial() {
         {3,6346.6, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"}
     };
     UpperMantle.SetSubLayers(sublayersconfigUM);
-
-    
-    // ------------------------------------------------------------
-    // Select blocks to update in SubLayer #2 (Mantle)
-    // ------------------------------------------------------------
-
-   
-
-    // IDs of blocks you want to modify
-    std::vector<int> blockIDs = {80, 81, 93};
-
-    // New material properties for these blocks
-    std::string newMaterialName = "AnomalousMantle";
-
-    std::vector<double> newA       = {28.0, 28.0, 28.0};   // Atomic mass
-    std::vector<double> newZ       = {14.0, 14.0, 14.0};   // Atomic number
-    std::vector<double> newDensity = {3.5,  3.6,  3.4};    // g/cm^3
-
-
-    // ------------------------------------------------------------
-    // Apply the update
-    // ------------------------------------------------------------
-
-
-    //Check for updates in SuUBLAYER
-    size_t sublayerIndex = 2;
-
-      // IDs of blocks you want to modify
-    std::vector<int> blockID1s = {3, 7, 12};
-
-    LowerMantle.UpdateBlocksInSubLayer(
-        1,
-        blockIDs,
-        newMaterialName,
-        newA,
-        newZ,
-        newDensity
-    );
-
-     // IDs of blocks you want to modify
-    std::vector<int> blockIDs2 = {9, 15, 21};
-
-    UpperMantle.UpdateBlocksInSubLayer(
-        sublayerIndex,
-        blockIDs,
-        newMaterialName,
-        newA,
-        newZ,
-        newDensity
-    );
-
-
-
-
-    // ------------------------------------------------------------
-    // Optional: verify changes
-    // ------------------------------------------------------------
-    UpperMantle.SubLayerSummary(sublayerIndex);
-
     UpperMantle.BuildLayer();
 
     ModularEarth::Layer Crust("Crust",5,dphi,dtheta);
@@ -207,10 +148,6 @@ void LayerTutorial() {
     top->AddNode(Ocean.GetLayerVolume(),        Ocean.GetLayerIndex(),        new TGeoTranslation(0, 0, 0));
     top->AddNode(Atmosphere.GetLayerVolume(),   Atmosphere.GetLayerIndex(),   new TGeoTranslation(0, 0, 0));
 
-    
-    //SubLayerBlockMap
-    LowerMantle.SubLayerBlockMap(1);
-    UpperMantle.SubLayerBlockMap(sublayerIndex);
 
     // printf("MODULAR_EARTH_DIR = %s\n", DMODULAR_EARTH_DIR);
 
@@ -219,70 +156,66 @@ void LayerTutorial() {
     /////////////////////////////
     
     geoManager->CloseGeometry(); //Here we finished the model creation. "Closed" means that no more modification can be made to the model.
-    geoManager->SetTopVisible();     // Ensure top volume shows up
 
+    if (!top) return;
 
-      // ---- Draw to a canvas
-    TCanvas *c = new TCanvas("c", "SubLayerTutorial", 1200, 900);
+    std::cout << "\n========== Main Assemblies ==========\n";
 
-    // SAFE in batch/headless: "ogl" or default (no OpenGL)
-    // Try "ogl" first; if you used "gl" and it fails in batch, switch to plain "ogl" or "".
-    top->Draw("gl");      // or: top->Draw("");
+    for (int i = 0; i < top->GetNdaughters(); ++i)
+    {
+        TGeoNode* mainNode = top->GetNode(i);
+        TGeoVolume* mainVol = mainNode->GetVolume();
 
-    c->Update();
+        std::cout << "\nMain daughter " << i
+                  << ": " << mainVol->GetName()
+                  << " [" << mainVol->ClassName() << "]\n";
 
+        int totalShellAssemblies = 0;
+        int totalSphereNodes = 0;
 
-    //view->ShowAxis();
+        if (mainVol->GetNdaughters() > 0){
+
+        for (int j = 0; j < mainVol->GetNdaughters(); ++j)
+        {
+            TGeoNode* shellNode = mainVol->GetNode(j);
+            TGeoVolume* shellVol = shellNode->GetVolume();
+
+            totalShellAssemblies++;
+
+            int nSpheres = 0;
+
+            for (int k = 0; k < shellVol->GetNdaughters(); ++k)
+            {
+                TGeoNode* sphereNode = shellVol->GetNode(k);
+                TGeoVolume* sphereVol = sphereNode->GetVolume();
+
+                if (sphereVol->GetShape()->IsA() == TGeoSphere::Class())
+                    nSpheres++;
+            }
+
+            totalSphereNodes += nSpheres;
+
+            std::cout << "  Shell assembly " << j
+                      << ": " << shellVol->GetName()
+                      << " | daughters = " << shellVol->GetNdaughters()
+                      << " | TGeoSpheres = " << nSpheres
+                      << "\n";
+        }
+
+        std::cout << "  Total shell assemblies: "
+                  << totalShellAssemblies << "\n";
+
+        std::cout << "  Total TGeoSphere placements: "
+                  << totalSphereNodes << "\n";
+        }
+        else {
+            std::cout << "  Unique volume.\n";
+            if (mainVol->GetShape()->IsA() == TGeoSphere::Class())
+                std::cout << "  Shape is a TGeoSphere.\n";
+        }
+    }
+
+    std::cout << "\n=====================================\n";
 
 }
 
-/*
-    //TestEarth
-    TGeoMaterial *matIC = new TGeoMaterial("SolidNiFe",  0.4691, 1, 12.9807);
-    TGeoMedium *medIC = new TGeoMedium("SolidNiFe", 1, matIC);
-    TGeoVolume* InnerCore = new TGeoVolume("InnerCore_1", new TGeoSphere("Sphere", 0, 1221.5), medIC);
-
-    //
-    ModularEarth::Layer OuterCore("OuterCore",2,dphi,dtheta);
-    std::vector<ModularEarth::SublayerConfig> sublayersconfigOC = {
-        {1,1221.5, 3480.0, 10.0861, 0.4691, 1, "FeNi"}
-    };
-    OuterCore.SetSubLayers(sublayersconfigOC);
-    OuterCore.BuildLayer();
-
-    ModularEarth::Layer LowerMantle("LowerMantle",3,dphi,dtheta);
-    std::vector<ModularEarth::SublayerConfig> sublayersconfigLM = {
-        {1,3480.0, 5701.0, 4.4872, 0.4691, 1, "SilicateLM"}
-    };
-    LowerMantle.SetSubLayers(sublayersconfigLM);
-    LowerMantle.BuildLayer();
-
-    ModularEarth::Layer UpperMantle("UpperMantle",4,dphi,dtheta);
-    std::vector<ModularEarth::SublayerConfig> sublayersconfigUM = {
-        {1,5701.0, 6356.0, 2.9000	, 0.4956, 1, "SilicateC"}
-    };
-    UpperMantle.SetSubLayers(sublayersconfigUM);
-    UpperMantle.BuildLayer();
-
-    ModularEarth::Layer Crust("Crust",5,dphi,dtheta);
-    std::vector<ModularEarth::SublayerConfig> sublayersconfigC = {
-        {1,6356.0, 6368.0, 2.6000	, 0.4956, 1, "SilicateC"}
-    };
-    Crust.SetSubLayers(sublayersconfigC);
-    Crust.BuildLayer();
-
-    ModularEarth::Layer Ocean("Ocean",6,dphi,dtheta);
-    std::vector<ModularEarth::SublayerConfig> sublayersconfigO = {
-        {1,6368.0, 6371.0, 1.0200	, 0.5525, 1, "SilicateO"}
-    };
-    Ocean.SetSubLayers(sublayersconfigO);
-    Ocean.BuildLayer();
-
-    ModularEarth::Layer Atmosphere("Atmosphere",7,dphi,dtheta);
-
-      std::vector<ModularEarth::SublayerConfig> sublayersconfigAtm = {
-        {1,6371.0, 6386.0	, 0.001	, 0.4991, 1, "Vac"}
-    };
-    Atmosphere.SetSubLayers(sublayersconfigAtm);
-    Atmosphere.BuildLayer();
-*/

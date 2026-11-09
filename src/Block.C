@@ -59,22 +59,10 @@ namespace ModularEarth {
         atomicMass   = A;
         atomicNumber = Z;
         density      = rho;
-
-        // Clean any previous material/medium if you re-define
-        delete blockMedium;   blockMedium = nullptr;
-        delete blockMaterial; blockMaterial = nullptr;
-
-        // ROOT-registered names encode the full hierarchical address so they are
-        // globally unique across the model. The user-supplied name is preserved in
-        // materialName for summaries and material-property lookups.
-        std::string rootName = Form("BlockMat_%d_%d_%d", i_ly, i_sly, i_blk);
-        blockMaterial = new TGeoMaterial(rootName.c_str(), A, Z, rho);
-        blockMedium   = new TGeoMedium(Form("BlockMed_%d_%d_%d", i_ly, i_sly, i_blk),
-                                       i_blk, blockMaterial);
     }
 
-    void Block::BuildBlock(int /*colorid*/) {
-        if (!blockMedium) {
+    void Block::BuildBlock(TGeoMedium* medium) {
+        if (!medium) {
             std::cerr << "ERROR: Medium not defined before building a block!\n";
             return;
         }
@@ -84,14 +72,17 @@ namespace ModularEarth {
             return;
         }
 
-        // If rebuilding, delete previous volume first
-        delete block;
+        // Do NOT delete the previous TGeoVolume here. ROOT's TGeoManager owns every volume it
+        // registers via its internal TLists. Calling delete on a ROOT-managed object leaves
+        // dangling pointers inside the manager, causing crashes the next time the geometry is
+        // navigated or the volume is accessed. Leaked volumes are cleaned up when the
+        // TGeoManager itself is destroyed.
         block = nullptr;
 
         TGeoShape* shape = new TGeoSphere(Form("BlockShape_%d_%d_%d", i_ly, i_sly, i_blk),
                                         rmin, rmax, thetamin, thetamax, phimin, phimax);
 
-        block = new TGeoVolume(Form("BlockVol_%d_%d_%d", i_ly, i_sly, i_blk), shape, blockMedium);
+        block = new TGeoVolume(Form("BlockVol_%d_%d_%d", i_ly, i_sly, i_blk), shape, medium);
         block->SetVisibility(kTRUE);
 
         if (BlockModified) {
@@ -106,8 +97,6 @@ namespace ModularEarth {
 
     bool Block::IsValid() const {
         return (block != nullptr &&
-                blockMaterial != nullptr &&
-                blockMedium != nullptr &&
                 rmax > rmin &&
                 thetamax > thetamin &&
                 phimax > phimin &&
@@ -117,16 +106,10 @@ namespace ModularEarth {
     }
 
     void Block::InvalidBlockSummary(std::ostream& os) const
-    {   
+    {
 
         if (block == nullptr)
             os << "  block (TGeoVolume*) is null\n";
-
-        if (blockMaterial == nullptr)
-            os << "  blockMaterial (TGeoMaterial*) is null\n";
-
-        if (blockMedium == nullptr)
-            os << "  blockMedium (TGeoMedium*) is null\n";
 
         if (!(rmax > rmin))
             os << "  invalid radii: rmin=" << rmin << ", rmax=" << rmax << "\n";
@@ -168,23 +151,15 @@ namespace ModularEarth {
             std::cout << "  Shape:           Not a TGeoSphere or invalid\n";
         }
 
-        if (blockMedium && blockMedium->GetMaterial()) {
-            TGeoMaterial* mat = blockMedium->GetMaterial();
-            std::cout << std::boolalpha
-                    << "  Specific Block Modified: " << BlockModified << "\n"
-                    << "  Sub Layer Modified:      " << SubLayerModified << "\n";
-            std::cout << "  Material:        " << mat->GetName() << "\n";
-            std::cout << "  Atomic Num  Z:   " << mat->GetZ() << "\n";
-            std::cout << "  Atomic Mass A:   " << mat->GetA() << "\n";
-            std::cout << "  Density:         " << mat->GetDensity() << " g/cm^3\n";
-        } else {
-            std::cout << "  Material:        Undefined\n";
-        }
-
+        std::cout << std::boolalpha
+                << "  Specific Block Modified: " << BlockModified << "\n"
+                << "  Sub Layer Modified:      " << SubLayerModified << "\n";
+        std::cout << "  Material:        " << materialName << "\n";
+        std::cout << "  Atomic Num  Z:   " << atomicNumber << "\n";
+        std::cout << "  Atomic Mass A:   " << atomicMass << "\n";
+        std::cout << "  Density:         " << density << " g/cm^3\n";
         std::cout << "  Pointers:\n";
         std::cout << "    Volume:        " << block << "\n";
-        std::cout << "    Material:      " << blockMaterial << "\n";
-        std::cout << "    Medium:        " << blockMedium << "\n";
         std::cout << "=====================\n";
     }
 

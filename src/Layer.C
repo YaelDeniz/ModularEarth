@@ -26,12 +26,19 @@ namespace ModularEarth {
     void Layer::SetSubLayers(const std::vector < SublayerConfig > & configs) {
         layerVolume = new TGeoVolumeAssembly(layerName.c_str());
 
+        // Pre-allocate so push_back never reallocates the sublayers vector mid-loop.
+        // Without this, the vector's growth triggers Sublayer's copy constructor on existing
+        // elements. Because Sublayer holds std::string members whose move constructor is not
+        // guaranteed noexcept on all platforms, std::vector falls back from move to copy,
+        // which shallow-copies TGeoVolume* pointers and crashes inside ROOT's object tracking.
+        sublayers.reserve(configs.size());
+
         for (const auto & cfg: configs) {
             Sublayer sub;
             sub.SetSubLayerIndex(cfg.sublayerID, i_ly);
             sub.SetSubLayerMaterial(cfg.materialName, cfg.atomicMass, cfg.atomicNumber, cfg.density);
             sub.CreateSubLayerBlocks(cfg.rmin, cfg.rmax, dphi, dth);
-            sublayers.push_back(sub);
+            sublayers.push_back(std::move(sub));
         }
     }
 
@@ -105,7 +112,8 @@ namespace ModularEarth {
             return;
         }
         
-        Sublayer sl = sublayers[sublayerIndex - 1];
+        // Use a const reference — Sublayer copy is deleted to prevent aliasing ROOT pointers.
+        const Sublayer& sl = sublayers[sublayerIndex - 1];
         sl.GetAllBlockSummary();
     }
 
@@ -115,7 +123,8 @@ namespace ModularEarth {
             return;
         }
         
-        Sublayer  sl = sublayers[sublayerIndex - 1];
+        // Use a const reference — Sublayer copy is deleted to prevent aliasing ROOT pointers.
+        const Sublayer& sl = sublayers[sublayerIndex - 1];
         sl.GetBlockSummary(blockIndex);
     }
 

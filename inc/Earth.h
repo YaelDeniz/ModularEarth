@@ -154,10 +154,14 @@ namespace ModularEarth {
         medVac     = new TGeoMedium("Vacuum", 1, matVac);
         top        = new TGeoVolume("EarthTopSphere", new TGeoSphere("Sphere", 0, 7000), medVac);
         geoManager->SetTopVolume(top);
+        
+        std::cout << "Setting Earth model: " << this->premtable << std::endl;
+        SetEarthModel(this->premtable);
+        std::cout << "Earth model set, call BuildEarth() to build the Earth geometry." << std::endl;
     }
 
         // Parse Earth model from prem tables (rmax, ρ, Z/A, layer index)
-        void SetEarthModel(TString premtable);
+        void SetEarthModel(TString premtable_);
 
         void SetBlockSizes(double dth, double dphi);
 
@@ -188,7 +192,7 @@ namespace ModularEarth {
 
 
         // Build the full ROOT geometry tree from the loaded PREM configuration
-        void BuiltEarth();
+        void BuildEarth();
         void GetModelSummary() const;
 
         // Single-block setters (marks isModified only)
@@ -215,12 +219,12 @@ namespace ModularEarth {
         void ForcedMaterialCache(std::vector<std::vector<std::vector<BlockMatInfo>>> NewBlockMaterialCache);
 
         // Set the detector position used by GetEarthPath.
-        // Must be called after BuiltEarth().
+        // Must be called after BuildEarth().
         void SetDetectorLocation(double lon, double lat, double R_det);
 
         // Sweep a th_grid × phi (fixed azimuth) and return one PropaPath per angle.
         // Uses MultiGeomPathCache when available; falls back to live tracking otherwise.
-        // Must be called after BuiltEarth() and SetDetectorLocation().
+        // Must be called after BuildEarth() and SetDetectorLocation().
 
         //Multiple definiion of 
         std::vector<PropaPath> GetEarthPath(double th_grid= 180,

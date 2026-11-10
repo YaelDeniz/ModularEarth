@@ -288,14 +288,26 @@ namespace ModularEarth {
             std::cout << "[DEBUG] Last segment: none recorded.\n";
         } else {
             const PathSegment& last = segments.back();
+
+            // Retrieve radial boundaries from the block's TGeoSphere shape
+            double rmin_last = -1.0, rmax_last = -1.0;
+            TGeoVolume* lastVol = geoManager->GetVolume(last.volName.c_str());
+            if (lastVol) {
+                TGeoSphere* sph = dynamic_cast<TGeoSphere*>(lastVol->GetShape());
+                if (sph) { rmin_last = sph->GetRmin(); rmax_last = sph->GetRmax(); }
+            }
+
             std::cout << "[DEBUG] Last segment appended:"
-                      << "  step="  << last.step
-                      << "  vol="   << last.volName
-                      << "  (ly="   << last.i_ly
-                      << " sly="    << last.i_sly
-                      << " blk="    << last.i_blk << ")"
-                      << "  dL="    << last.distance   << " km"
-                      << "  cumL="  << last.cumulative << " km"
+                      << "  step="    << last.step
+                      << "  vol="     << last.volName
+                      << "  (ly="     << last.i_ly
+                      << " sly="      << last.i_sly
+                      << " blk="      << last.i_blk << ")"
+                      << "  dL="      << last.distance   << " km"
+                      << "  cumL="    << last.cumulative << " km"
+                      << "  rmin="    << rmin_last       << " km"
+                      << "  rmax="    << rmax_last       << " km"
+                      << "  density=" << last.density    << " g/cm3"
                       << "  |  expected total_dist=" << total_dist << " km\n";
         }
         // -------------------------------------------------------------

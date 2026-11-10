@@ -96,6 +96,20 @@ namespace ModularEarth {
             return;
         }
 
+        // Clamp th away from exactly 0 and 180 (degrees) or 0 and pi (radians).
+        // A perfectly vertical direction places r_src at a pole of the angular
+        // tiling, which is a degenerate vertex shared by all phi-bin boundaries
+        // and guaranteed to trigger the boundary-straddling failure.
+        const double TH_EPS = 1e-4; // degrees
+        if (!radians) {
+            if (th >= 180.0 - TH_EPS) th = 180.0 - TH_EPS;
+            if (th <=         TH_EPS) th =         TH_EPS;
+        } else {
+            const double erad = TH_EPS * TMath::Pi() / 180.0;
+            if (th >= TMath::Pi() - erad) th = TMath::Pi() - erad;
+            if (th <=              erad)  th =               erad;
+        }
+
         double th_rad, phi_rad;
         if (!radians) {
             th_rad  = (180.0 - th)  * TMath::Pi() / 180.0;
@@ -126,18 +140,66 @@ namespace ModularEarth {
         // Localize the track in the geometry hierarchy (required after InitTrack)
         geoManager->FindNode();
 
-        // r_src lies exactly on the R_ATM sphere boundary — nudge inside if needed
-        const double EPSNUDGE = 1e-5; // cm
-        auto nudge_into_next = [&] {
-            const double* X = geoManager->GetCurrentPoint();
-            const double* D = geoManager->GetCurrentDirection();
-            geoManager->SetCurrentPoint(X[0] + EPSNUDGE * D[0],
-                                        X[1] + EPSNUDGE * D[1],
-                                        X[2] + EPSNUDGE * D[2]);
-            geoManager->FindNode();
+        // --- DEBUG: confirm which volume ROOT assigned the starting point to ---
+        {
+            TGeoVolume* startVol = geoManager->GetCurrentVolume();
+            const double* sp = geoManager->GetCurrentPoint();
+            double sR = std::sqrt(sp[0]*sp[0] + sp[1]*sp[1] + sp[2]*sp[2]);
+            std::cout << "[DEBUG] After FindNode(): volume = \""
+                      << (startVol ? startVol->GetName() : "NULL")
+                      << "\"  |r_src| = " << sR
+                      << "  IsOutside=" << geoManager->IsOutside()
+                      << "  IsOnBoundary=" << geoManager->IsOnBoundary() << "\n";
+        }
+        // -----------------------------------------------------------------------
+
+        // Returns true iff the navigator is currently inside a named BlockVol.
+        // Catches (a) IsOnBoundary()=true, (b) silent vacuum assignment to
+        // EarthTopSphere, and (c) phi/theta/vertex boundary — all three failure
+        // modes that can cause the track to skip layers at initialization.
+        auto is_in_block_vol = [&]() -> bool {
+            if (geoManager->IsOutside()) return false;
+            TGeoVolume* v = geoManager->GetCurrentVolume();
+            if (!v) return false;
+            int il = 0, isl = 0, ibl = 0;
+            return std::sscanf(v->GetName(),
+                               "BlockVol_%d_%d_%d", &il, &isl, &ibl) == 3;
         };
 
-        if (geoManager->IsOnBoundary()) nudge_into_next();
+        const double EPSNUDGE          = 1e-5; // cm — above ROOT's ~1e-9 cm boundary tolerance
+        const int    MAX_NUDGE_RETRIES = 20;
+
+        // Nudge the track forward along the current direction and re-locate.
+        // With maxRetries > 1 keeps nudging until inside a valid BlockVol or
+        // until the limit is reached (needed for degenerate boundary vertices).
+        // Default maxRetries=1 preserves the original single-step behaviour used
+        // by the post-step boundary call at the bottom of the loop.
+        auto nudge_into_next = [&](int maxRetries = 1) {
+            for (int r = 0; r < maxRetries; ++r) {
+                const double* X = geoManager->GetCurrentPoint();
+                const double* D = geoManager->GetCurrentDirection();
+                geoManager->SetCurrentPoint(X[0] + EPSNUDGE * D[0],
+                                            X[1] + EPSNUDGE * D[1],
+                                            X[2] + EPSNUDGE * D[2]);
+                geoManager->FindNode();
+                if (geoManager->IsOutside() || is_in_block_vol()) break;
+            }
+        };
+
+        // Robust initialization: nudge until inside a BlockVol.
+        // When r_src is already cleanly placed (the common case), is_in_block_vol()
+        // is true immediately and zero nudges are applied.
+        if (!is_in_block_vol()) {
+            nudge_into_next(MAX_NUDGE_RETRIES);
+        }
+        if (!is_in_block_vol() && !geoManager->IsOutside()) {
+            TGeoVolume* cv = geoManager->GetCurrentVolume();
+            std::cerr << "[EarthPaths] WARNING: after " << MAX_NUDGE_RETRIES
+                      << " init retries, track not in a BlockVol. Volume: \""
+                      << (cv ? cv->GetName() : "NULL") << "\""
+                      << "  IsOutside="    << geoManager->IsOutside()
+                      << "  IsOnBoundary=" << geoManager->IsOnBoundary() << "\n";
+        }
 
         const double ZEPS = 1e-10;
         int    stepN = 0;
@@ -153,12 +215,24 @@ namespace ModularEarth {
             TGeoMaterial* mat  = med ? med->GetMaterial() : nullptr;
             std::string   vName = vol->GetName();
 
+            //Debug-----------------------------------------------------------------
+            const double* raw = geoManager->GetCurrentPoint();
+            double Xi[3] = { raw[0], raw[1], raw[2] };   // safe copy
+            double Ri = std::sqrt(Xi[0]*Xi[0] + Xi[1]*Xi[1] + Xi[2]*Xi[2]);
+            //----------------------------------------------------------------------
             geoManager->FindNextBoundaryAndStep();
             double step = geoManager->GetStep();
 
             // Zero step on a boundary — push into the next volume and retry
             if (step <= ZEPS && geoManager->IsOnBoundary()) {
-                nudge_into_next();
+                nudge_into_next(MAX_NUDGE_RETRIES);
+                if (!is_in_block_vol() && !geoManager->IsOutside()) {
+                    TGeoVolume* sv = geoManager->GetCurrentVolume();
+                    std::cerr << "[EarthPaths] WARNING: stall at cumL=" << sumL
+                              << " km — after " << MAX_NUDGE_RETRIES
+                              << " retries still not in a BlockVol. Volume: \""
+                              << (sv ? sv->GetName() : "NULL") << "\". Continuing.\n";
+                }
                 continue;
             }
 
@@ -191,6 +265,12 @@ namespace ModularEarth {
                                      mat->GetA() });
             }
 
+            //Debug-----------------------------------------------------------------
+            std::cout << "  [Step " << stepN << "] Start |r| = " << Ri
+                    << " km | dL = " << step
+                    << " km | cumL = " << sumL << " km\n";
+            //----------------------------------------------------------------------
+
             double tol = 1e-2;
 
             if (std::abs(sumL - total_dist) <= tol) break;
@@ -202,6 +282,23 @@ namespace ModularEarth {
             // Push past a boundary surface into the next volume
             if (geoManager->IsOnBoundary()) nudge_into_next();
         }
+
+        // --- DEBUG: confirm last recorded segment and path closure ---
+        if (segments.empty()) {
+            std::cout << "[DEBUG] Last segment: none recorded.\n";
+        } else {
+            const PathSegment& last = segments.back();
+            std::cout << "[DEBUG] Last segment appended:"
+                      << "  step="  << last.step
+                      << "  vol="   << last.volName
+                      << "  (ly="   << last.i_ly
+                      << " sly="    << last.i_sly
+                      << " blk="    << last.i_blk << ")"
+                      << "  dL="    << last.distance   << " km"
+                      << "  cumL="  << last.cumulative << " km"
+                      << "  |  expected total_dist=" << total_dist << " km\n";
+        }
+        // -------------------------------------------------------------
     }
 
     // -------------------------------------------------------------------------

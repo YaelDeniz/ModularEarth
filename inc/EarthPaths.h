@@ -67,6 +67,10 @@ namespace ModularEarth {
         TGeoManager* geoManager = nullptr;
 
         // Atmospheric sphere radius — neutrino source is placed here [km]
+        // Set to the outer surface of the atmosphere block (rmax=6386). The
+        // retry-nudge initialization in GetSegments() handles the resulting
+        // radial boundary by nudging r_src inward until FindNode() assigns it
+        // to a BlockVol.
         static constexpr double R_ATM = 6386.0;
 
         // Model-frame position vectors (Earth center as origin) [km]
